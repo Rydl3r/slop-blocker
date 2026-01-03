@@ -6,6 +6,8 @@ let currentDomain = null;
 let trackingInterval = null;
 let isTracking = false;
 let isBlockedSite = false;
+let isCheckingMedia = false;
+let isCheckingTracking = false;
 
 // Get the current domain
 function getCurrentDomain() {
@@ -14,23 +16,35 @@ function getCurrentDomain() {
 
 // Check if media (audio/video) is currently playing on the page
 function isMediaPlaying() {
-  // Check all video elements
-  const videos = document.querySelectorAll('video');
-  for (const video of videos) {
-    if (!video.paused && !video.ended && video.readyState > 2) {
-      return true;
-    }
-  }
+  // Guard against recursive calls (YouTube's patched DOM can cause this)
+  if (isCheckingMedia) return false;
+  isCheckingMedia = true;
 
-  // Check all audio elements
-  const audios = document.querySelectorAll('audio');
-  for (const audio of audios) {
-    if (!audio.paused && !audio.ended && audio.readyState > 2) {
-      return true;
+  try {
+    // Check all video elements
+    const videos = document.getElementsByTagName('video');
+    for (let i = 0; i < videos.length; i++) {
+      const video = videos[i];
+      if (video && !video.paused && !video.ended && video.readyState > 2) {
+        return true;
+      }
     }
-  }
 
-  return false;
+    // Check all audio elements
+    const audios = document.getElementsByTagName('audio');
+    for (let i = 0; i < audios.length; i++) {
+      const audio = audios[i];
+      if (audio && !audio.paused && !audio.ended && audio.readyState > 2) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (e) {
+    return false;
+  } finally {
+    isCheckingMedia = false;
+  }
 }
 
 // Start tracking time
@@ -46,12 +60,27 @@ function startTracking(domain, blocked) {
   trackingInterval = setInterval(() => {
     sendTimeUpdate();
   }, 30000);
+}
 
-  console.log(
-    '[Slop Blocker] Started tracking:',
-    domain,
-    blocked ? '(blocked)' : '(unblocked)'
-  );
+// Safe message sending that avoids stack overflow on sites like YouTube
+let isSendingMessage = false;
+
+function safeSendMessage(message, callback) {
+  if (isSendingMessage) return;
+  if (!chrome.runtime?.id) return; // Extension context invalidated
+
+  isSendingMessage = true;
+  queueMicrotask(() => {
+    try {
+      if (chrome.runtime?.id) {
+        chrome.runtime.sendMessage(message, callback);
+      }
+    } catch (e) {
+      // Silently fail - extension may have been reloaded
+    } finally {
+      isSendingMessage = false;
+    }
+  });
 }
 
 // Send time update to background
@@ -60,19 +89,13 @@ function sendTimeUpdate() {
 
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
   if (elapsed > 0) {
-    try {
-      chrome.runtime.sendMessage({
-        type: 'RECORD_TIME',
-        domain: currentDomain,
-        seconds: elapsed,
-        isBlocked: isBlockedSite,
-      });
-    } catch (e) {
-      // Extension context invalidated - stop tracking
-      console.log('[Slop Blocker] Extension reloaded, stopping tracker');
-      stopTracking();
-      return;
-    }
+    safeSendMessage({
+      type: 'RECORD_TIME',
+      domain: currentDomain,
+      seconds: elapsed,
+      isBlocked: isBlockedSite,
+    });
+
     // Reset start time for next interval
     startTime = Date.now();
   }
@@ -82,16 +105,18 @@ function sendTimeUpdate() {
 function stopTracking() {
   if (!isTracking) return;
 
-  sendTimeUpdate();
+  // Set isTracking to false first to prevent recursive calls
+  // (sendTimeUpdate may call stopTracking if extension context is invalidated)
+  isTracking = false;
 
   if (trackingInterval) {
     clearInterval(trackingInterval);
     trackingInterval = null;
   }
 
-  isTracking = false;
+  sendTimeUpdate();
+
   startTime = null;
-  console.log('[Slop Blocker] Stopped tracking:', currentDomain);
 }
 
 // Check if we should continue tracking (visibility or media playing)
@@ -101,27 +126,41 @@ function shouldContinueTracking() {
 }
 
 // Check and update tracking state
-async function checkAndStartTracking() {
+function checkAndStartTracking() {
+  // Guard against recursive/concurrent calls
+  if (isCheckingTracking || isTracking) return;
+  if (!chrome.runtime?.id) return; // Extension context invalidated
+
+  isCheckingTracking = true;
+
   const domain = getCurrentDomain();
 
   // Skip extension pages
   if (domain.includes('chrome-extension') || domain === '') {
+    isCheckingTracking = false;
     return;
   }
 
-  try {
-    const response = await chrome.runtime.sendMessage({
+  safeSendMessage(
+    {
       type: 'CHECK_SITE',
       url: window.location.href,
       domain: domain,
-    });
+    },
+    (response) => {
+      isCheckingTracking = false;
+      // Always track, just mark whether it's a blocked site or not
+      startTracking(domain, response?.isBlocked || false);
+    }
+  );
 
-    // Always track, just mark whether it's a blocked site or not
-    startTracking(domain, response?.isBlocked || false);
-  } catch (e) {
-    // Extension context may be invalidated, still track as unblocked
-    startTracking(domain, false);
-  }
+  // Fallback: reset flag after timeout in case callback never fires
+  setTimeout(() => {
+    if (isCheckingTracking) {
+      isCheckingTracking = false;
+      startTracking(domain, false);
+    }
+  }, 1000);
 }
 
 // Handle visibility changes (tab switching, minimizing)
@@ -136,18 +175,35 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Periodically check for media state changes (every 5 seconds)
-setInterval(() => {
-  if (document.hidden && isMediaPlaying() && !isTracking) {
-    // Tab is hidden but media started playing - resume tracking
-    checkAndStartTracking();
-  } else if (document.hidden && !isMediaPlaying() && isTracking) {
-    // Tab is hidden and media stopped - stop tracking
-    stopTracking();
+let mediaCheckInterval = null;
+
+function startMediaCheck() {
+  if (mediaCheckInterval) return; // Prevent duplicate intervals
+
+  mediaCheckInterval = setInterval(() => {
+    if (document.hidden && isMediaPlaying() && !isTracking) {
+      // Tab is hidden but media started playing - resume tracking
+      checkAndStartTracking();
+    } else if (document.hidden && !isMediaPlaying() && isTracking) {
+      // Tab is hidden and media stopped - stop tracking
+      stopTracking();
+    }
+  }, 5000);
+}
+
+function stopMediaCheck() {
+  if (mediaCheckInterval) {
+    clearInterval(mediaCheckInterval);
+    mediaCheckInterval = null;
   }
-}, 5000);
+}
+
+// Start the media check on script load
+startMediaCheck();
 
 // Handle page unload
 window.addEventListener('beforeunload', () => {
+  stopMediaCheck();
   stopTracking();
 });
 
