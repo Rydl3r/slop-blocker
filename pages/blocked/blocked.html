@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Site Blocked - Slop Blocker</title>
+    <link rel="stylesheet" href="blocked.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">🛡️</div>
+      <h1>Site Blocked</h1>
+      <p class="domain" id="blockedDomain">This site has been blocked</p>
+
+      <div class="quote-container">
+        <blockquote id="quoteText"></blockquote>
+        <cite id="quoteAuthor"></cite>
+      </div>
+
+      <!-- Progress Ring -->
+      <div class="progress-section">
+        <div class="progress-ring-container">
+          <svg class="progress-ring" viewBox="0 0 120 120">
+            <circle class="progress-ring-bg" cx="60" cy="60" r="54" />
+            <circle
+              class="progress-ring-fill"
+              cx="60"
+              cy="60"
+              r="54"
+              id="progressRing"
+            />
+          </svg>
+          <div class="progress-center">
+            <span class="progress-value" id="streakValue">0</span>
+            <span class="progress-label">day streak</span>
+          </div>
+        </div>
+        <p class="progress-message" id="progressMessage">Keep going!</p>
+      </div>
+
+      <div class="stats-preview">
+        <div class="stat">
+          <span class="stat-value" id="todayAttempts">0</span>
+          <span class="stat-label">Blocks Today</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="timeWasted">0m</span>
+          <span class="stat-label">Time on Slop Today</span>
+        </div>
+      </div>
+
+      <!-- Motivational tip -->
+      <div class="tip-container" id="tipContainer">
+        <span class="tip-icon">💡</span>
+        <p class="tip-text" id="tipText"></p>
+      </div>
+
+      <div class="actions">
+        <button id="goBack" class="btn btn-primary">Go Back</button>
+        <a href="/pages/stats/stats.html" class="btn btn-secondary"
+          >View Stats</a
+        >
+      </div>
+
+      <p class="reminder">
+        Remember why you installed this extension. You've got this! 💪
+      </p>
+    </div>
+
+    <script src="blocked.js" type="module"></script>
+  </body>
+</html>

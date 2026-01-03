@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slop Blocker - Settings</title>
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="header-content">
+          <h1>🛡️ Slop Blocker</h1>
+          <p class="subtitle">Manage your blocked sites</p>
+        </div>
+        <nav>
+          <a href="/pages/stats/stats.html" class="nav-link">📊 Statistics</a>
+        </nav>
+      </header>
+
+      <main>
+        <!-- Global Toggle -->
+        <section class="card">
+          <div class="toggle-row">
+            <div>
+              <h2>Blocking Enabled</h2>
+              <p class="description">Turn blocking on or off globally</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="globalToggle" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Add New Rule -->
+        <section class="card">
+          <h2>Add New Block Rule</h2>
+          <form id="addRuleForm">
+            <div class="form-group">
+              <label for="pattern">Website to Block</label>
+              <input
+                type="text"
+                id="pattern"
+                placeholder="e.g., twitter.com or youtube.com/shorts/*"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="ruleType">Match Type</label>
+              <select id="ruleType">
+                <option value="domain">Domain (blocks entire site)</option>
+                <option value="url">URL Pattern (with wildcards)</option>
+                <option value="regex">Regular Expression</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Rule</button>
+          </form>
+
+          <div id="formError" class="error-message hidden"></div>
+        </section>
+
+        <!-- Blocked Sites List -->
+        <section class="card">
+          <h2>Blocked Sites</h2>
+          <div id="rulesList" class="rules-list">
+            <p class="empty-state">
+              No sites blocked yet. Add your first rule above!
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <p>Slop Blocker v1.0.0 • Stay focused! 💪</p>
+      </footer>
+    </div>
+
+    <script src="admin.js" type="module"></script>
+  </body>
+</html>

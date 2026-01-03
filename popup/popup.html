@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slop Blocker</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="popup">
+      <header>
+        <h1>🛡️ Slop Blocker</h1>
+      </header>
+
+      <main>
+        <!-- Main Toggle -->
+        <div class="toggle-section">
+          <div class="toggle-info">
+            <span class="toggle-label">Blocking</span>
+            <span class="toggle-status" id="statusText">Active</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="mainToggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="stats-row">
+          <div class="stat">
+            <span class="stat-value" id="todayBlocks">0</span>
+            <span class="stat-label">Blocked Today</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="streak">0</span>
+            <span class="stat-label">Day Streak</span>
+          </div>
+        </div>
+
+        <!-- Blocked Sites Count -->
+        <div class="rules-count">
+          <span id="rulesCount">0</span> sites blocked
+        </div>
+      </main>
+
+      <footer>
+        <a href="/pages/admin/admin.html" class="footer-link" id="openSettings">
+          ⚙️ Settings
+        </a>
+        <a href="/pages/stats/stats.html" class="footer-link" id="openStats">
+          📊 Statistics
+        </a>
+      </footer>
+    </div>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

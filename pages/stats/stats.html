@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Statistics - Slop Blocker</title>
+    <link rel="stylesheet" href="stats.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="header-content">
+          <h1>📊 Statistics</h1>
+          <p class="subtitle">Track your progress</p>
+        </div>
+        <nav>
+          <a href="/pages/admin/admin.html" class="nav-link">⚙️ Settings</a>
+        </nav>
+      </header>
+
+      <main>
+        <!-- Streak Section -->
+        <section class="card streak-card">
+          <div class="streak-display">
+            <div class="streak-icon">🔥</div>
+            <div class="streak-value" id="currentStreak">0</div>
+            <div class="streak-label">Day Streak</div>
+          </div>
+          <div class="streak-meta">
+            <p>Longest streak: <strong id="longestStreak">0</strong> days</p>
+          </div>
+        </section>
+
+        <!-- Today's Stats -->
+        <section class="card">
+          <h2>Today's Activity</h2>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-value" id="todayAttempts">0</div>
+              <div class="stat-label">Block Attempts</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value warning" id="todayTimeSpent">0m</div>
+              <div class="stat-label">Time on Blocked Sites</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value success" id="todayTimeUnblocked">0m</div>
+              <div class="stat-label">Time on Other Sites</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value success" id="totalTimeSpent">0m</div>
+              <div class="stat-label">Total Browsing Today</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+          <!-- Time Distribution Doughnut -->
+          <section class="card chart-card">
+            <h2>⏱️ Time Distribution Today</h2>
+            <div class="chart-container doughnut-container">
+              <canvas id="timeDistributionChart"></canvas>
+            </div>
+          </section>
+
+          <!-- Top Sites Pie -->
+          <section class="card chart-card">
+            <h2>🎯 Top Blocked Sites</h2>
+            <div class="chart-container doughnut-container">
+              <canvas id="topSitesChart"></canvas>
+            </div>
+          </section>
+        </div>
+
+        <!-- Block Attempts Trend -->
+        <section class="card">
+          <div class="chart-header">
+            <h2>🛡️ Block Attempts</h2>
+            <div class="period-selector">
+              <button
+                class="period-btn active"
+                data-period="week"
+                data-chart="blocks"
+              >
+                Week
+              </button>
+              <button
+                class="period-btn"
+                data-period="month"
+                data-chart="blocks"
+              >
+                Month
+              </button>
+              <button class="period-btn" data-period="year" data-chart="blocks">
+                Year
+              </button>
+            </div>
+          </div>
+          <div class="chart-container bar-container">
+            <canvas id="blockAttemptsChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Browsing Time Trend -->
+        <section class="card">
+          <div class="chart-header">
+            <h2>📈 Browsing Time Trend</h2>
+            <div class="period-selector">
+              <button
+                class="period-btn active"
+                data-period="week"
+                data-chart="time"
+              >
+                Week
+              </button>
+              <button class="period-btn" data-period="month" data-chart="time">
+                Month
+              </button>
+              <button class="period-btn" data-period="year" data-chart="time">
+                Year
+              </button>
+            </div>
+          </div>
+          <div class="chart-container line-container">
+            <canvas id="browsingTimeChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Blocked vs Unblocked Time -->
+        <section class="card">
+          <div class="chart-header">
+            <h2>⚖️ Blocked vs Productive Time</h2>
+            <div class="period-selector">
+              <button
+                class="period-btn active"
+                data-period="week"
+                data-chart="comparison"
+              >
+                Week
+              </button>
+              <button
+                class="period-btn"
+                data-period="month"
+                data-chart="comparison"
+              >
+                Month
+              </button>
+              <button
+                class="period-btn"
+                data-period="year"
+                data-chart="comparison"
+              >
+                Year
+              </button>
+            </div>
+          </div>
+          <div class="chart-container bar-container">
+            <canvas id="comparisonChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Site Lists -->
+        <div class="charts-row">
+          <!-- Time Spent on Blocked Sites -->
+          <section class="card">
+            <h2>⚠️ Time on Blocked Sites</h2>
+            <p class="section-description">When blocking was disabled</p>
+            <div id="timeSpentSites" class="top-sites">
+              <p class="empty-state">No time tracked yet today</p>
+            </div>
+          </section>
+
+          <!-- Time Spent on Other Sites -->
+          <section class="card">
+            <h2>🌐 Time on Other Sites</h2>
+            <p class="section-description">All other browsing</p>
+            <div id="timeSpentUnblockedSites" class="top-sites">
+              <p class="empty-state">No time tracked yet today</p>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <footer>
+        <p>Keep going! Every blocked distraction is a win 🏆</p>
+      </footer>
+    </div>
+
+    <script src="../../assets/chart.min.js"></script>
+    <script src="stats.js" type="module"></script>
+  </body>
+</html>
