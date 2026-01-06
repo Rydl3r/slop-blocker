@@ -27,19 +27,12 @@ const currentStreakEl = document.getElementById('currentStreak');
 const longestStreakEl = document.getElementById('longestStreak');
 const todayAttemptsEl = document.getElementById('todayAttempts');
 const todayTimeSpentEl = document.getElementById('todayTimeSpent');
-const todayTimeUnblockedEl = document.getElementById('todayTimeUnblocked');
-const totalTimeSpentEl = document.getElementById('totalTimeSpent');
 const timeSpentSitesEl = document.getElementById('timeSpentSites');
-const timeSpentUnblockedSitesEl = document.getElementById(
-  'timeSpentUnblockedSites'
-);
 
 // Chart instances
-let timeDistributionChart = null;
 let topSitesChart = null;
 let blockAttemptsChart = null;
 let browsingTimeChart = null;
-let comparisonChart = null;
 
 // Cached data
 let cachedStats = null;
@@ -48,7 +41,6 @@ let cachedStats = null;
 const chartPeriods = {
   blocks: 'week',
   time: 'week',
-  comparison: 'week',
 };
 
 // Initialize
@@ -110,43 +102,29 @@ function renderStats(stats) {
     blockAttempts: 0,
     sitesAttempted: {},
     timeSpent: {},
-    timeSpentUnblocked: {},
   };
 
   todayAttemptsEl.textContent = todayStats.blockAttempts;
 
-  // Time calculations
+  // Time on blocked sites
   const blockedTimeSeconds = Object.values(todayStats.timeSpent || {}).reduce(
     (a, b) => a + b,
     0
   );
-  const unblockedTimeSeconds = Object.values(
-    todayStats.timeSpentUnblocked || {}
-  ).reduce((a, b) => a + b, 0);
-  const totalTodaySeconds = blockedTimeSeconds + unblockedTimeSeconds;
 
   todayTimeSpentEl.textContent = formatTime(blockedTimeSeconds);
-  todayTimeUnblockedEl.textContent = formatTime(unblockedTimeSeconds);
-  totalTimeSpentEl.textContent = formatTime(totalTodaySeconds);
 
-  // Site lists
+  // Site list
   renderTimeSpentSites(
     todayStats.timeSpent || {},
     timeSpentSitesEl,
     'No time on blocked sites today - great job! 🎉'
   );
-  renderTimeSpentSites(
-    todayStats.timeSpentUnblocked || {},
-    timeSpentUnblockedSitesEl,
-    'No browsing tracked yet today'
-  );
 
   // Charts
-  renderTimeDistributionChart(blockedTimeSeconds, unblockedTimeSeconds);
   renderTopSitesChart(todayStats.sitesAttempted || {});
   renderBlockAttemptsChart(stats.daily, 'week');
   renderBrowsingTimeChart(stats.daily, 'week');
-  renderComparisonChart(stats.daily, 'week');
 }
 
 // Update a specific chart
@@ -157,9 +135,6 @@ function updateChart(chartType, dailyStats, period) {
       break;
     case 'time':
       renderBrowsingTimeChart(dailyStats, period);
-      break;
-    case 'comparison':
-      renderComparisonChart(dailyStats, period);
       break;
   }
 }
@@ -183,10 +158,6 @@ function getPeriodData(dailyStats, period) {
           (a, b) => a + b,
           0
         ),
-        unblockedTime: Object.values(dayStats.timeSpentUnblocked || {}).reduce(
-          (a, b) => a + b,
-          0
-        ),
       });
     }
   } else if (period === 'month') {
@@ -197,8 +168,7 @@ function getPeriodData(dailyStats, period) {
       weekStart.setDate(weekStart.getDate() - daysToMonday - w * 7);
 
       let attempts = 0,
-        blockedTime = 0,
-        unblockedTime = 0;
+        blockedTime = 0;
 
       for (let d = 0; d < 7; d++) {
         const date = new Date(weekStart);
@@ -211,14 +181,11 @@ function getPeriodData(dailyStats, period) {
           (a, b) => a + b,
           0
         );
-        unblockedTime += Object.values(
-          dayStats.timeSpentUnblocked || {}
-        ).reduce((a, b) => a + b, 0);
       }
 
       const label =
         w === 0 ? 'This week' : w === 1 ? 'Last week' : `${w + 1}w ago`;
-      data.push({ label, attempts, blockedTime, unblockedTime });
+      data.push({ label, attempts, blockedTime });
     }
   } else if (period === 'year') {
     for (let m = 11; m >= 0; m--) {
@@ -230,8 +197,7 @@ function getPeriodData(dailyStats, period) {
       );
 
       let attempts = 0,
-        blockedTime = 0,
-        unblockedTime = 0;
+        blockedTime = 0;
 
       for (let d = 1; d <= monthEnd.getDate(); d++) {
         const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
@@ -243,73 +209,17 @@ function getPeriodData(dailyStats, period) {
           (a, b) => a + b,
           0
         );
-        unblockedTime += Object.values(
-          dayStats.timeSpentUnblocked || {}
-        ).reduce((a, b) => a + b, 0);
       }
 
       data.push({
         label: monthDate.toLocaleDateString('en-GB', { month: 'short' }),
         attempts,
         blockedTime,
-        unblockedTime,
       });
     }
   }
 
   return data;
-}
-
-// Time Distribution Doughnut Chart
-function renderTimeDistributionChart(blockedTime, unblockedTime) {
-  const ctx = document.getElementById('timeDistributionChart');
-
-  if (timeDistributionChart) {
-    timeDistributionChart.destroy();
-  }
-
-  const hasData = blockedTime > 0 || unblockedTime > 0;
-
-  timeDistributionChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: hasData ? ['Blocked Sites', 'Other Sites'] : ['No data yet'],
-      datasets: [
-        {
-          data: hasData ? [blockedTime, unblockedTime] : [1],
-          backgroundColor: hasData
-            ? [colors.danger, colors.primary]
-            : ['rgba(255,255,255,0.1)'],
-          borderWidth: 0,
-          hoverOffset: 10,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '65%',
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            padding: 20,
-            usePointStyle: true,
-            pointStyle: 'circle',
-          },
-        },
-        tooltip: {
-          callbacks: {
-            label: (context) => {
-              if (!hasData) return 'Start browsing to see data';
-              const value = context.raw;
-              return ` ${formatTime(value)}`;
-            },
-          },
-        },
-      },
-    },
-  });
 }
 
 // Top Sites Pie Chart
@@ -420,7 +330,7 @@ function renderBlockAttemptsChart(dailyStats, period) {
   });
 }
 
-// Browsing Time Line Chart
+// Blocked Time Line Chart
 function renderBrowsingTimeChart(dailyStats, period) {
   const ctx = document.getElementById('browsingTimeChart');
   const data = getPeriodData(dailyStats, period);
@@ -435,7 +345,7 @@ function renderBrowsingTimeChart(dailyStats, period) {
       labels: data.map((d) => d.label),
       datasets: [
         {
-          label: 'Blocked Sites',
+          label: 'Time on Blocked Sites',
           data: data.map((d) => toHours(d.blockedTime)),
           borderColor: colors.danger,
           backgroundColor: 'rgba(233, 69, 96, 0.1)',
@@ -444,17 +354,6 @@ function renderBrowsingTimeChart(dailyStats, period) {
           pointRadius: 4,
           pointHoverRadius: 6,
           pointBackgroundColor: colors.danger,
-        },
-        {
-          label: 'Other Sites',
-          data: data.map((d) => toHours(d.unblockedTime)),
-          borderColor: colors.primary,
-          backgroundColor: 'rgba(100, 255, 218, 0.1)',
-          fill: true,
-          tension: 0.4,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: colors.primary,
         },
       ],
     },
@@ -466,17 +365,10 @@ function renderBrowsingTimeChart(dailyStats, period) {
         mode: 'index',
       },
       plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            usePointStyle: true,
-            pointStyle: 'circle',
-            padding: 20,
-          },
-        },
+        legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (context) => ` ${context.dataset.label}: ${context.raw}h`,
+            label: (context) => ` ${context.raw}h`,
           },
         },
       },
@@ -490,83 +382,6 @@ function renderBrowsingTimeChart(dailyStats, period) {
           grid: { color: 'rgba(255,255,255,0.05)' },
         },
         x: {
-          grid: { display: false },
-        },
-      },
-    },
-  });
-}
-
-// Comparison Stacked Bar Chart
-function renderComparisonChart(dailyStats, period) {
-  const ctx = document.getElementById('comparisonChart');
-  const data = getPeriodData(dailyStats, period);
-
-  if (comparisonChart) {
-    comparisonChart.destroy();
-  }
-
-  comparisonChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: data.map((d) => d.label),
-      datasets: [
-        {
-          label: 'Blocked Sites',
-          data: data.map((d) => toHours(d.blockedTime)),
-          backgroundColor: colors.danger,
-          borderRadius: {
-            topLeft: 0,
-            topRight: 0,
-            bottomLeft: 8,
-            bottomRight: 8,
-          },
-          borderSkipped: false,
-        },
-        {
-          label: 'Productive Time',
-          data: data.map((d) => toHours(d.unblockedTime)),
-          backgroundColor: colors.primary,
-          borderRadius: {
-            topLeft: 8,
-            topRight: 8,
-            bottomLeft: 0,
-            bottomRight: 0,
-          },
-          borderSkipped: false,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            usePointStyle: true,
-            pointStyle: 'circle',
-            padding: 20,
-          },
-        },
-        tooltip: {
-          callbacks: {
-            label: (context) => ` ${context.dataset.label}: ${context.raw}h`,
-          },
-        },
-      },
-      scales: {
-        y: {
-          stacked: true,
-          beginAtZero: true,
-          title: {
-            display: true,
-            text: 'Hours',
-          },
-          grid: { color: 'rgba(255,255,255,0.05)' },
-        },
-        x: {
-          stacked: true,
           grid: { display: false },
         },
       },

@@ -144,13 +144,9 @@ async function handleMessage(message, sender) {
       return { isBlocked, domain: message.domain };
 
     case 'RECORD_TIME':
-      // Record time spent on a site (blocked or unblocked)
-      if (message.domain && message.seconds > 0) {
-        await recordTimeSpent(
-          message.domain,
-          message.seconds,
-          message.isBlocked || false
-        );
+      // Record time spent on a blocked site
+      if (message.domain && message.seconds > 0 && message.isBlocked) {
+        await recordTimeSpent(message.domain, message.seconds);
         return { success: true };
       }
       return { success: false };

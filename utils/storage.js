@@ -18,7 +18,6 @@ const DEFAULT_STATS = {
   },
   totalBlockAttempts: 0,
   timeSpent: {}, // domain -> total seconds spent (blocked sites)
-  timeSpentUnblocked: {}, // domain -> total seconds spent (unblocked sites)
 };
 
 const DEFAULT_SETTINGS = {
@@ -136,8 +135,8 @@ export async function recordBlockAttempt(domain) {
   return stats;
 }
 
-// Record time spent on a tracked domain
-export async function recordTimeSpent(domain, seconds, isBlocked = true) {
+// Record time spent on a blocked domain
+export async function recordTimeSpent(domain, seconds) {
   const stats = await getStats();
   const today = getTodayKey();
 
@@ -147,42 +146,28 @@ export async function recordTimeSpent(domain, seconds, isBlocked = true) {
       blockAttempts: 0,
       sitesAttempted: {},
       timeSpent: {},
-      timeSpentUnblocked: {},
       visitedBlockedSite: false,
     };
   }
 
-  // Initialize timeSpent objects if needed
+  // Initialize timeSpent if needed
   if (!stats.daily[today].timeSpent) {
     stats.daily[today].timeSpent = {};
-  }
-  if (!stats.daily[today].timeSpentUnblocked) {
-    stats.daily[today].timeSpentUnblocked = {};
   }
   if (!stats.timeSpent) {
     stats.timeSpent = {};
   }
-  if (!stats.timeSpentUnblocked) {
-    stats.timeSpentUnblocked = {};
-  }
 
-  // Add time to appropriate category
-  if (isBlocked) {
-    stats.daily[today].timeSpent[domain] =
-      (stats.daily[today].timeSpent[domain] || 0) + seconds;
-    stats.timeSpent[domain] = (stats.timeSpent[domain] || 0) + seconds;
+  // Add time to blocked sites
+  stats.daily[today].timeSpent[domain] =
+    (stats.daily[today].timeSpent[domain] || 0) + seconds;
+  stats.timeSpent[domain] = (stats.timeSpent[domain] || 0) + seconds;
 
-    // Mark that user visited a blocked site today - this breaks the streak
-    if (!stats.daily[today].visitedBlockedSite) {
-      stats.daily[today].visitedBlockedSite = true;
-      // Reset current streak immediately
-      stats.streaks.current = 0;
-    }
-  } else {
-    stats.daily[today].timeSpentUnblocked[domain] =
-      (stats.daily[today].timeSpentUnblocked[domain] || 0) + seconds;
-    stats.timeSpentUnblocked[domain] =
-      (stats.timeSpentUnblocked[domain] || 0) + seconds;
+  // Mark that user visited a blocked site today - this breaks the streak
+  if (!stats.daily[today].visitedBlockedSite) {
+    stats.daily[today].visitedBlockedSite = true;
+    // Reset current streak immediately
+    stats.streaks.current = 0;
   }
 
   await saveStats(stats);

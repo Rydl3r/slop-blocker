@@ -1,11 +1,10 @@
-// Content script for time tracking on ALL websites
-// Tracks time spent and reports to background whether site is blocked or not
+// Content script for time tracking on BLOCKED websites only
+// Tracks time spent on blocked sites that user manages to access
 
 let startTime = null;
 let currentDomain = null;
 let trackingInterval = null;
 let isTracking = false;
-let isBlockedSite = false;
 let isCheckingMedia = false;
 let isCheckingTracking = false;
 
@@ -47,12 +46,11 @@ function isMediaPlaying() {
   }
 }
 
-// Start tracking time
-function startTracking(domain, blocked) {
+// Start tracking time (only for blocked sites)
+function startTracking(domain) {
   if (isTracking) return;
 
   currentDomain = domain;
-  isBlockedSite = blocked;
   startTime = Date.now();
   isTracking = true;
 
@@ -93,7 +91,7 @@ function sendTimeUpdate() {
       type: 'RECORD_TIME',
       domain: currentDomain,
       seconds: elapsed,
-      isBlocked: isBlockedSite,
+      isBlocked: true,
     });
 
     // Reset start time for next interval
@@ -149,8 +147,10 @@ function checkAndStartTracking() {
     },
     (response) => {
       isCheckingTracking = false;
-      // Always track, just mark whether it's a blocked site or not
-      startTracking(domain, response?.isBlocked || false);
+      // Only track if site is blocked
+      if (response?.isBlocked) {
+        startTracking(domain);
+      }
     }
   );
 
@@ -158,7 +158,6 @@ function checkAndStartTracking() {
   setTimeout(() => {
     if (isCheckingTracking) {
       isCheckingTracking = false;
-      startTracking(domain, false);
     }
   }, 1000);
 }
@@ -207,5 +206,5 @@ window.addEventListener('beforeunload', () => {
   stopTracking();
 });
 
-// Start tracking when script loads (track ALL sites)
+// Check if site is blocked when script loads
 checkAndStartTracking();
