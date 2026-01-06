@@ -15,6 +15,10 @@ const patternInput = document.getElementById('pattern');
 const ruleTypeSelect = document.getElementById('ruleType');
 const rulesList = document.getElementById('rulesList');
 const formError = document.getElementById('formError');
+const enableSchedule = document.getElementById('enableSchedule');
+const scheduleOptions = document.getElementById('scheduleOptions');
+const startTimeInput = document.getElementById('startTime');
+const endTimeInput = document.getElementById('endTime');
 
 // Initialize
 async function init() {
@@ -51,7 +55,14 @@ function renderRules(rules) {
       }">
       <div class="rule-info">
         <div class="rule-pattern">${escapeHtml(rule.pattern)}</div>
-        <div class="rule-type">${getTypeLabel(rule.type)}</div>
+        <div class="rule-meta">
+          <span class="rule-type">${getTypeLabel(rule.type)}</span>
+          ${
+            rule.schedule?.enabled
+              ? `<span class="rule-schedule">⏰ ${rule.schedule.startTime} - ${rule.schedule.endTime}</span>`
+              : ''
+          }
+        </div>
       </div>
       <div class="rule-actions">
         <label class="switch" style="transform: scale(0.7);">
@@ -116,6 +127,11 @@ function setupEventListeners() {
     notifyBackgroundUpdate();
   });
 
+  // Schedule toggle
+  enableSchedule.addEventListener('change', () => {
+    scheduleOptions.classList.toggle('hidden', !enableSchedule.checked);
+  });
+
   // Add rule form
   addRuleForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -137,11 +153,30 @@ function setupEventListeners() {
       return;
     }
 
+    // Build rule object
+    const ruleData = { pattern, type };
+
+    // Add schedule if enabled
+    if (enableSchedule.checked) {
+      const selectedDays = Array.from(
+        document.querySelectorAll('input[name="days"]:checked')
+      ).map((cb) => parseInt(cb.value));
+
+      ruleData.schedule = {
+        enabled: true,
+        startTime: startTimeInput.value,
+        endTime: endTimeInput.value,
+        days: selectedDays,
+      };
+    }
+
     // Add the rule
-    await addRule({ pattern, type });
+    await addRule(ruleData);
 
     // Clear form and reload
     patternInput.value = '';
+    enableSchedule.checked = false;
+    scheduleOptions.classList.add('hidden');
     hideError();
     await loadRules();
     notifyBackgroundUpdate();

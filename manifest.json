@@ -5,6 +5,7 @@
   "description": "Block distracting websites and reclaim your time",
   "permissions": [
     "storage",
+    "alarms",
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "tabs",

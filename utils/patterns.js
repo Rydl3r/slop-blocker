@@ -87,6 +87,50 @@ function matchesRegex(url, pattern) {
 }
 
 /**
+ * Check if current time is within the scheduled blocking hours
+ * @param {Object} rule - The block rule with optional schedule
+ * @returns {boolean} - Whether blocking should be active now
+ */
+export function isWithinSchedule(rule) {
+  // If no schedule is set, always block
+  if (!rule.schedule || !rule.schedule.enabled) {
+    return true;
+  }
+
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentTimeMinutes = currentHour * 60 + currentMinute;
+
+  // Check if current day is in the active days
+  if (rule.schedule.days && rule.schedule.days.length > 0) {
+    if (!rule.schedule.days.includes(currentDay)) {
+      return false;
+    }
+  }
+
+  // Parse start and end times
+  const startTime = parseTimeToMinutes(rule.schedule.startTime || '00:00');
+  const endTime = parseTimeToMinutes(rule.schedule.endTime || '23:59');
+
+  // Handle overnight schedules (e.g., 22:00 to 06:00)
+  if (startTime > endTime) {
+    return currentTimeMinutes >= startTime || currentTimeMinutes <= endTime;
+  }
+
+  return currentTimeMinutes >= startTime && currentTimeMinutes <= endTime;
+}
+
+/**
+ * Parse time string (HH:MM) to minutes since midnight
+ */
+function parseTimeToMinutes(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+/**
  * Extract domain from URL
  */
 export function extractDomain(url) {

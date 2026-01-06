@@ -62,6 +62,7 @@ export async function addRule(rule) {
     type: rule.type || 'domain',
     enabled: true,
     createdAt: Date.now(),
+    schedule: rule.schedule || null, // Time-based blocking schedule
     ...rule,
   };
   rules.push(newRule);
@@ -203,31 +204,44 @@ export async function getTodayTimeSpent() {
 export async function updateStreak() {
   const stats = await getStats();
   const today = getTodayKey();
-  const yesterday = getYesterdayKey();
-
-  // Check if yesterday had a blocked site visit (streak broken)
-  const yesterdayStats = stats.daily[yesterday];
-  const yesterdayWasClean = !yesterdayStats?.visitedBlockedSite;
 
   // If we haven't updated streak for today yet
   if (stats.streaks.lastCleanDate !== today) {
-    if (stats.streaks.lastCleanDate === yesterday && yesterdayWasClean) {
-      // Yesterday was clean, continue streak
-      stats.streaks.current++;
-    } else if (
-      stats.streaks.lastCleanDate === yesterday &&
-      !yesterdayWasClean
-    ) {
-      // Yesterday had blocked site visit, streak broken
-      stats.streaks.current = 1;
-    } else if (stats.streaks.lastCleanDate !== null) {
-      // Missed days, start fresh
-      stats.streaks.current = 1;
-    } else {
-      // First day ever
-      stats.streaks.current = 1;
+    // Calculate streak by counting consecutive clean days backwards
+    let streak = 0;
+    let checkDate = new Date();
+
+    // Start from yesterday (today isn't over yet)
+    checkDate.setDate(checkDate.getDate() - 1);
+
+    // Count consecutive clean days
+    while (true) {
+      const dateKey = checkDate.toISOString().split('T')[0];
+      const dayStats = stats.daily[dateKey];
+
+      // If no data for this day, check if it's before we started tracking
+      if (!dayStats) {
+        // If we have no data and streak is 0, this might be a new install
+        // or days before tracking started - stop counting
+        break;
+      }
+
+      // If the day had a blocked site visit, streak is broken
+      if (dayStats.visitedBlockedSite) {
+        break;
+      }
+
+      // Day was clean, increment streak
+      streak++;
+
+      // Move to previous day
+      checkDate.setDate(checkDate.getDate() - 1);
+
+      // Safety limit - don't go back more than 365 days
+      if (streak > 365) break;
     }
 
+    stats.streaks.current = streak;
     stats.streaks.lastCleanDate = today;
 
     if (stats.streaks.current > stats.streaks.longest) {

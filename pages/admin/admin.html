@@ -56,6 +56,61 @@
               </select>
             </div>
 
+            <!-- Time Schedule Section -->
+            <div class="form-group">
+              <label class="schedule-toggle-label">
+                <input type="checkbox" id="enableSchedule" />
+                <span>Enable time-based blocking</span>
+              </label>
+            </div>
+
+            <div id="scheduleOptions" class="schedule-options hidden">
+              <div class="form-row">
+                <div class="form-group half">
+                  <label for="startTime">Start Time</label>
+                  <input type="time" id="startTime" value="09:00" />
+                </div>
+                <div class="form-group half">
+                  <label for="endTime">End Time</label>
+                  <input type="time" id="endTime" value="18:00" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Active Days</label>
+                <div class="days-selector">
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="0" />
+                    <span>Sun</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="1" checked />
+                    <span>Mon</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="2" checked />
+                    <span>Tue</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="3" checked />
+                    <span>Wed</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="4" checked />
+                    <span>Thu</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="5" checked />
+                    <span>Fri</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="days" value="6" />
+                    <span>Sat</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <button type="submit" class="btn btn-primary">Add Rule</button>
           </form>
 

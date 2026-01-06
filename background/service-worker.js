@@ -7,7 +7,11 @@ import {
   recordTimeSpent,
   updateStreak,
 } from '../utils/storage.js';
-import { matchesRule, extractDomain } from '../utils/patterns.js';
+import {
+  matchesRule,
+  extractDomain,
+  isWithinSchedule,
+} from '../utils/patterns.js';
 
 // Dynamic rule ID counter (start high to avoid conflicts)
 let ruleIdCounter = 1000;
@@ -20,12 +24,28 @@ chrome.runtime.onInstalled.addListener(async () => {
   console.log('Slop Blocker installed');
   await updateStreak();
   await updateBlockingRules();
+  setupScheduleAlarm();
 });
 
 // Update streak on startup
 chrome.runtime.onStartup.addListener(async () => {
   await updateStreak();
   await updateBlockingRules();
+  setupScheduleAlarm();
+});
+
+// Setup periodic alarm to update time-based blocking rules
+function setupScheduleAlarm() {
+  // Create alarm to fire every minute for time-based schedule checks
+  chrome.alarms.create('updateScheduledRules', { periodInMinutes: 1 });
+}
+
+// Listen for alarm to update time-based rules and streak
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === 'updateScheduledRules') {
+    await updateStreak(); // Update streak daily
+    await updateBlockingRules();
+  }
 });
 
 // Listen for rule matches to capture blocked URL info
@@ -52,7 +72,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (!settings.enabled) return;
 
   const rules = await getRules();
-  const matchedRule = rules.find((rule) => matchesRule(details.url, rule));
+  const matchedRule = rules.find(
+    (rule) => matchesRule(details.url, rule) && isWithinSchedule(rule)
+  );
 
   if (matchedRule) {
     const domain = extractDomain(details.url);
@@ -114,10 +136,10 @@ async function handleMessage(message, sender) {
       return null;
 
     case 'CHECK_SITE':
-      // Check if the domain/URL is in the block list
+      // Check if the domain/URL is in the block list and within schedule
       const checkRules = await getRules();
-      const isBlocked = checkRules.some((rule) =>
-        matchesRule(message.url, rule)
+      const isBlocked = checkRules.some(
+        (rule) => matchesRule(message.url, rule) && isWithinSchedule(rule)
       );
       return { isBlocked, domain: message.domain };
 
@@ -134,7 +156,8 @@ async function handleMessage(message, sender) {
       return { success: false };
 
     case 'GET_STATS':
-      // Return current stats for the blocked page
+      // Update streak first, then return current stats
+      await updateStreak();
       const { getStats: fetchStats, getTodayKey: getToday } = await import(
         '../utils/storage.js'
       );
@@ -170,8 +193,8 @@ async function updateBlockingRules() {
     return;
   }
 
-  // Create new rules for enabled block rules
-  const enabledRules = rules.filter((r) => r.enabled);
+  // Create new rules for enabled block rules that are within their schedule
+  const enabledRules = rules.filter((r) => r.enabled && isWithinSchedule(r));
   const newRules = enabledRules.map((rule, index) => {
     const ruleId = ruleIdCounter + index;
 
