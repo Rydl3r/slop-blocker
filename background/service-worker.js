@@ -5,6 +5,7 @@ import {
   getSettings,
   recordBlockAttempt,
   recordTimeSpent,
+  recordSlippage,
   updateStreak,
 } from '../utils/storage.js';
 import {
@@ -73,7 +74,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   const rules = await getRules();
   const matchedRule = rules.find(
-    (rule) => matchesRule(details.url, rule) && isWithinSchedule(rule)
+    (rule) => matchesRule(details.url, rule) && isWithinSchedule(rule),
   );
 
   if (matchedRule) {
@@ -139,24 +140,52 @@ async function handleMessage(message, sender) {
       // Check if the domain/URL is in the block list and within schedule
       const checkRules = await getRules();
       const isBlocked = checkRules.some(
-        (rule) => matchesRule(message.url, rule) && isWithinSchedule(rule)
+        (rule) => matchesRule(message.url, rule) && isWithinSchedule(rule),
       );
       return { isBlocked, domain: message.domain };
 
+    case 'RECORD_VISIT':
+      // Record a visit to a blocked site immediately (triggers slippage)
+      if (message.domain) {
+        const visitRules = await getRules();
+        const isBlockedSite = visitRules.some(
+          (rule) =>
+            matchesRule(message.url || `https://${message.domain}`, rule) &&
+            isWithinSchedule(rule),
+        );
+        if (isBlockedSite) {
+          const result = await recordSlippage(message.domain);
+          return { success: true, ...result };
+        }
+      }
+      return { success: false };
+
     case 'RECORD_TIME':
       // Record time spent on a blocked site
+      // Re-verify that the site is still within the blocked schedule
+      // This prevents streak from being broken if user stays on a page
+      // past the scheduled blocking hours
       if (message.domain && message.seconds > 0 && message.isBlocked) {
-        await recordTimeSpent(message.domain, message.seconds);
-        return { success: true };
+        const timeRules = await getRules();
+        const stillBlocked = timeRules.some(
+          (rule) =>
+            matchesRule(message.url || `https://${message.domain}`, rule) &&
+            isWithinSchedule(rule),
+        );
+        if (stillBlocked) {
+          await recordTimeSpent(message.domain, message.seconds);
+          return { success: true, stillBlocked: true };
+        }
+        // Site is no longer in blocked schedule - don't record time
+        return { success: false, stillBlocked: false };
       }
       return { success: false };
 
     case 'GET_STATS':
       // Update streak first, then return current stats
       await updateStreak();
-      const { getStats: fetchStats, getTodayKey: getToday } = await import(
-        '../utils/storage.js'
-      );
+      const { getStats: fetchStats, getTodayKey: getToday } =
+        await import('../utils/storage.js');
       const currentStats = await fetchStats();
       const todayKey = getToday();
       return { stats: currentStats, today: todayKey };

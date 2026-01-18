@@ -5,8 +5,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    sans-serif;
   background: #0a0a0f;
   color: #ccd6f6;
   min-height: 100vh;
@@ -279,6 +280,56 @@ header {
   background: rgba(100, 255, 218, 0.15);
   border-color: #64ffda;
   color: #64ffda;
+}
+
+/* Slippages Section */
+.slippages-card {
+  border-color: rgba(233, 69, 96, 0.3);
+}
+
+.slippages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.slippage-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background: rgba(233, 69, 96, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #e94560;
+}
+
+.slippage-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slippage-domain {
+  font-family: 'Monaco', 'Consolas', monospace;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.slippage-time {
+  color: #8892b0;
+  font-size: 0.8rem;
+}
+
+.slippage-streak {
+  background: rgba(233, 69, 96, 0.2);
+  color: #e94560;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: nowrap;
 }
 
 /* Footer */

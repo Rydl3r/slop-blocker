@@ -54,29 +54,53 @@ function startTracking(domain) {
   startTime = Date.now();
   isTracking = true;
 
-  // Send time updates every 30 seconds
+  // Record the visit immediately (this triggers slippage recording)
+  safeSendMessage({
+    type: 'RECORD_VISIT',
+    domain: currentDomain,
+    url: window.location.href,
+  });
+
+  // Send time updates every 5 seconds for accurate tracking
   trackingInterval = setInterval(() => {
     sendTimeUpdate();
-  }, 30000);
+  }, 5000);
 }
 
 // Safe message sending that avoids stack overflow on sites like YouTube
-let isSendingMessage = false;
+const messageQueue = [];
+let isProcessingQueue = false;
 
 function safeSendMessage(message, callback) {
-  if (isSendingMessage) return;
   if (!chrome.runtime?.id) return; // Extension context invalidated
 
-  isSendingMessage = true;
+  messageQueue.push({ message, callback });
+  processMessageQueue();
+}
+
+function processMessageQueue() {
+  if (isProcessingQueue || messageQueue.length === 0) return;
+  if (!chrome.runtime?.id) return;
+
+  isProcessingQueue = true;
+  const { message, callback } = messageQueue.shift();
+
   queueMicrotask(() => {
     try {
       if (chrome.runtime?.id) {
-        chrome.runtime.sendMessage(message, callback);
+        chrome.runtime.sendMessage(message, (response) => {
+          if (callback) callback(response);
+          isProcessingQueue = false;
+          processMessageQueue(); // Process next message
+        });
+      } else {
+        isProcessingQueue = false;
+        processMessageQueue();
       }
     } catch (e) {
       // Silently fail - extension may have been reloaded
-    } finally {
-      isSendingMessage = false;
+      isProcessingQueue = false;
+      processMessageQueue();
     }
   });
 }
@@ -87,12 +111,22 @@ function sendTimeUpdate() {
 
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
   if (elapsed > 0) {
-    safeSendMessage({
-      type: 'RECORD_TIME',
-      domain: currentDomain,
-      seconds: elapsed,
-      isBlocked: true,
-    });
+    safeSendMessage(
+      {
+        type: 'RECORD_TIME',
+        domain: currentDomain,
+        url: window.location.href,
+        seconds: elapsed,
+        isBlocked: true,
+      },
+      (response) => {
+        // If the site is no longer within the blocked schedule, stop tracking
+        // This handles the case where user stays on a page past the scheduled blocking hours
+        if (response && response.stillBlocked === false) {
+          stopTracking();
+        }
+      },
+    );
 
     // Reset start time for next interval
     startTime = Date.now();
@@ -151,7 +185,7 @@ function checkAndStartTracking() {
       if (response?.isBlocked) {
         startTracking(domain);
       }
-    }
+    },
   );
 
   // Fallback: reset flag after timeout in case callback never fires
@@ -164,16 +198,23 @@ function checkAndStartTracking() {
 
 // Handle visibility changes (tab switching, minimizing)
 document.addEventListener('visibilitychange', () => {
-  if (shouldContinueTracking()) {
+  if (document.hidden) {
+    // Tab is now hidden - check if media is playing before stopping
+    // Use a short delay to let media state settle
+    setTimeout(() => {
+      if (document.hidden && !isMediaPlaying() && isTracking) {
+        stopTracking();
+      }
+    }, 500);
+  } else {
+    // Tab is now visible - start tracking if not already
     if (!isTracking) {
       checkAndStartTracking();
     }
-  } else {
-    stopTracking();
   }
 });
 
-// Periodically check for media state changes (every 5 seconds)
+// Periodically check for media state changes (every 2 seconds for responsiveness)
 let mediaCheckInterval = null;
 
 function startMediaCheck() {
@@ -187,7 +228,7 @@ function startMediaCheck() {
       // Tab is hidden and media stopped - stop tracking
       stopTracking();
     }
-  }, 5000);
+  }, 2000);
 }
 
 function stopMediaCheck() {

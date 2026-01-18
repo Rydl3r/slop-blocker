@@ -28,6 +28,7 @@ const longestStreakEl = document.getElementById('longestStreak');
 const todayAttemptsEl = document.getElementById('todayAttempts');
 const todayTimeSpentEl = document.getElementById('todayTimeSpent');
 const timeSpentSitesEl = document.getElementById('timeSpentSites');
+const slippagesListEl = document.getElementById('slippagesList');
 
 // Chart instances
 let topSitesChart = null;
@@ -78,8 +79,10 @@ function setupPeriodSelectors() {
 
 // Format seconds to readable time
 function formatTime(seconds) {
-  if (!seconds || seconds < 60) return '0m';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (!seconds || seconds === 0) return '0s';
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  if (seconds < 3600)
+    return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
   const hours = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
@@ -109,7 +112,7 @@ function renderStats(stats) {
   // Time on blocked sites
   const blockedTimeSeconds = Object.values(todayStats.timeSpent || {}).reduce(
     (a, b) => a + b,
-    0
+    0,
   );
 
   todayTimeSpentEl.textContent = formatTime(blockedTimeSeconds);
@@ -118,8 +121,11 @@ function renderStats(stats) {
   renderTimeSpentSites(
     todayStats.timeSpent || {},
     timeSpentSitesEl,
-    'No time on blocked sites today - great job! 🎉'
+    'No time on blocked sites today - great job! 🎉',
   );
+
+  // Slippages history
+  renderSlippages(stats.slippages || []);
 
   // Charts
   renderTopSitesChart(todayStats.sitesAttempted || {});
@@ -156,7 +162,7 @@ function getPeriodData(dailyStats, period) {
         attempts: dayStats.blockAttempts || 0,
         blockedTime: Object.values(dayStats.timeSpent || {}).reduce(
           (a, b) => a + b,
-          0
+          0,
         ),
       });
     }
@@ -179,7 +185,7 @@ function getPeriodData(dailyStats, period) {
         attempts += dayStats.blockAttempts || 0;
         blockedTime += Object.values(dayStats.timeSpent || {}).reduce(
           (a, b) => a + b,
-          0
+          0,
         );
       }
 
@@ -193,7 +199,7 @@ function getPeriodData(dailyStats, period) {
       const monthEnd = new Date(
         today.getFullYear(),
         today.getMonth() - m + 1,
-        0
+        0,
       );
 
       let attempts = 0,
@@ -207,7 +213,7 @@ function getPeriodData(dailyStats, period) {
         attempts += dayStats.blockAttempts || 0;
         blockedTime += Object.values(dayStats.timeSpent || {}).reduce(
           (a, b) => a + b,
-          0
+          0,
         );
       }
 
@@ -417,8 +423,53 @@ function renderTimeSpentSites(timeSpent, container, emptyMessage) {
       <span class="site-name">${escapeHtml(site)}</span>
       <span class="site-count time">${formatTime(seconds)}</span>
     </div>
-  `
+  `,
     )
+    .join('');
+}
+
+// Render slippages history
+function renderSlippages(slippages) {
+  if (!slippagesListEl) return;
+
+  if (!slippages || slippages.length === 0) {
+    slippagesListEl.innerHTML =
+      '<p class="empty-state">No slippages recorded - keep it up! 💪</p>';
+    return;
+  }
+
+  // Sort by timestamp, most recent first
+  const sortedSlippages = [...slippages].sort(
+    (a, b) => b.timestamp - a.timestamp,
+  );
+
+  slippagesListEl.innerHTML = sortedSlippages
+    .map((slip) => {
+      const date = new Date(slip.timestamp);
+      const formattedDate = date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      const formattedTime = date.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const streakText =
+        slip.streakBroken > 0
+          ? `${slip.streakBroken} day${slip.streakBroken === 1 ? '' : 's'} lost`
+          : 'Fresh start';
+
+      return `
+        <div class="slippage-item">
+          <div class="slippage-info">
+            <span class="slippage-domain">${escapeHtml(slip.domain)}</span>
+            <span class="slippage-time">${formattedDate} at ${formattedTime}</span>
+          </div>
+          <span class="slippage-streak">🔥 ${streakText}</span>
+        </div>
+      `;
+    })
     .join('');
 }
 

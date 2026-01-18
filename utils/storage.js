@@ -18,6 +18,7 @@ const DEFAULT_STATS = {
   },
   totalBlockAttempts: 0,
   timeSpent: {}, // domain -> total seconds spent (blocked sites)
+  slippages: [], // Array of { timestamp, domain, streakBroken } records
 };
 
 const DEFAULT_SETTINGS = {
@@ -163,15 +164,64 @@ export async function recordTimeSpent(domain, seconds) {
     (stats.daily[today].timeSpent[domain] || 0) + seconds;
   stats.timeSpent[domain] = (stats.timeSpent[domain] || 0) + seconds;
 
-  // Mark that user visited a blocked site today - this breaks the streak
-  if (!stats.daily[today].visitedBlockedSite) {
-    stats.daily[today].visitedBlockedSite = true;
-    // Reset current streak immediately
-    stats.streaks.current = 0;
-  }
+  // Note: Slippage is now recorded immediately via recordSlippage()
+  // This function only handles time tracking
 
   await saveStats(stats);
   return stats;
+}
+
+// Record a slippage (visiting a blocked site) - called immediately when visiting
+export async function recordSlippage(domain) {
+  const stats = await getStats();
+  const today = getTodayKey();
+
+  // Initialize today's stats if needed
+  if (!stats.daily[today]) {
+    stats.daily[today] = {
+      blockAttempts: 0,
+      sitesAttempted: {},
+      timeSpent: {},
+      visitedBlockedSite: false,
+      slippedDomains: [], // Track which domains we've already recorded slippages for today
+    };
+  }
+
+  // Initialize slippedDomains if it doesn't exist
+  if (!stats.daily[today].slippedDomains) {
+    stats.daily[today].slippedDomains = [];
+  }
+
+  // Record slippage for each unique domain visited today
+  if (!stats.daily[today].slippedDomains.includes(domain)) {
+    stats.daily[today].slippedDomains.push(domain);
+
+    // Record the slippage
+    if (!stats.slippages) {
+      stats.slippages = [];
+    }
+
+    // Only the first slippage of the day breaks the streak
+    const isFirstSlippageToday = !stats.daily[today].visitedBlockedSite;
+    const streakBroken = isFirstSlippageToday ? stats.streaks.current : 0;
+
+    stats.slippages.push({
+      timestamp: Date.now(),
+      domain: domain,
+      streakBroken: streakBroken,
+    });
+
+    // Reset streak only on first slippage of the day
+    if (isFirstSlippageToday) {
+      stats.daily[today].visitedBlockedSite = true;
+      stats.streaks.current = 0;
+    }
+
+    await saveStats(stats);
+    return { slippageRecorded: true, streakBroken: streakBroken };
+  }
+
+  return { slippageRecorded: false };
 }
 
 // Get total time spent today on tracked sites
