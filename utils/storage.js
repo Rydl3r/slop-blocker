@@ -147,7 +147,6 @@ export async function recordTimeSpent(domain, seconds) {
       blockAttempts: 0,
       sitesAttempted: {},
       timeSpent: {},
-      visitedBlockedSite: false,
     };
   }
 
@@ -164,15 +163,12 @@ export async function recordTimeSpent(domain, seconds) {
     (stats.daily[today].timeSpent[domain] || 0) + seconds;
   stats.timeSpent[domain] = (stats.timeSpent[domain] || 0) + seconds;
 
-  // Note: Slippage is now recorded immediately via recordSlippage()
-  // This function only handles time tracking
-
   await saveStats(stats);
   return stats;
 }
 
-// Record a slippage (visiting a blocked site) - called immediately when visiting
-export async function recordSlippage(domain) {
+// Record a slippage and reset streak - ONLY called when user presses bypass button
+export async function recordSlippageAndResetStreak(domain) {
   const stats = await getStats();
   const today = getTodayKey();
 
@@ -182,46 +178,33 @@ export async function recordSlippage(domain) {
       blockAttempts: 0,
       sitesAttempted: {},
       timeSpent: {},
-      visitedBlockedSite: false,
-      slippedDomains: [], // Track which domains we've already recorded slippages for today
     };
   }
 
-  // Initialize slippedDomains if it doesn't exist
-  if (!stats.daily[today].slippedDomains) {
-    stats.daily[today].slippedDomains = [];
+  // Record the slippage
+  if (!stats.slippages) {
+    stats.slippages = [];
   }
 
-  // Record slippage for each unique domain visited today
-  if (!stats.daily[today].slippedDomains.includes(domain)) {
-    stats.daily[today].slippedDomains.push(domain);
+  // Record how many days were lost
+  const streakBroken = stats.streaks.current;
 
-    // Record the slippage
-    if (!stats.slippages) {
-      stats.slippages = [];
-    }
+  stats.slippages.push({
+    timestamp: Date.now(),
+    domain: domain,
+    streakBroken: streakBroken,
+  });
 
-    // Only the first slippage of the day breaks the streak
-    const isFirstSlippageToday = !stats.daily[today].visitedBlockedSite;
-    const streakBroken = isFirstSlippageToday ? stats.streaks.current : 0;
+  // Reset streak to 0
+  stats.streaks.current = 0;
 
-    stats.slippages.push({
-      timestamp: Date.now(),
-      domain: domain,
-      streakBroken: streakBroken,
-    });
-
-    // Reset streak only on first slippage of the day
-    if (isFirstSlippageToday) {
-      stats.daily[today].visitedBlockedSite = true;
-      stats.streaks.current = 0;
-    }
-
-    await saveStats(stats);
-    return { slippageRecorded: true, streakBroken: streakBroken };
+  // Update longest streak if needed (in case it wasn't updated)
+  if (streakBroken > stats.streaks.longest) {
+    stats.streaks.longest = streakBroken;
   }
 
-  return { slippageRecorded: false };
+  await saveStats(stats);
+  return { slippageRecorded: true, streakBroken: streakBroken };
 }
 
 // Get total time spent today on tracked sites
@@ -235,50 +218,17 @@ export async function getTodayTimeSpent() {
   return Object.values(todayStats.timeSpent).reduce((a, b) => a + b, 0);
 }
 
-// Update streak (call this daily or on extension load)
-export async function updateStreak() {
+// Increment streak by 1 - called once per day
+export async function incrementStreak() {
   const stats = await getStats();
   const today = getTodayKey();
 
-  // If we haven't updated streak for today yet
-  if (stats.streaks.lastCleanDate !== today) {
-    // Calculate streak by counting consecutive clean days backwards
-    let streak = 0;
-    let checkDate = new Date();
+  // Only increment once per day
+  if (stats.streaks.lastIncrementDate !== today) {
+    stats.streaks.current += 1;
+    stats.streaks.lastIncrementDate = today;
 
-    // Start from yesterday (today isn't over yet)
-    checkDate.setDate(checkDate.getDate() - 1);
-
-    // Count consecutive clean days
-    while (true) {
-      const dateKey = checkDate.toISOString().split('T')[0];
-      const dayStats = stats.daily[dateKey];
-
-      // If no data for this day, check if it's before we started tracking
-      if (!dayStats) {
-        // If we have no data and streak is 0, this might be a new install
-        // or days before tracking started - stop counting
-        break;
-      }
-
-      // If the day had a blocked site visit, streak is broken
-      if (dayStats.visitedBlockedSite) {
-        break;
-      }
-
-      // Day was clean, increment streak
-      streak++;
-
-      // Move to previous day
-      checkDate.setDate(checkDate.getDate() - 1);
-
-      // Safety limit - don't go back more than 365 days
-      if (streak > 365) break;
-    }
-
-    stats.streaks.current = streak;
-    stats.streaks.lastCleanDate = today;
-
+    // Update longest streak if current exceeds it
     if (stats.streaks.current > stats.streaks.longest) {
       stats.streaks.longest = stats.streaks.current;
     }
@@ -321,6 +271,47 @@ function getYesterdayKey() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   return yesterday.toISOString().split('T')[0];
+}
+
+// Bypass storage functions
+const BYPASS_KEY = 'activeBypass';
+
+// Get active bypass info (domain -> expiry timestamp)
+export async function getActiveBypass() {
+  const data = await getStorageData(BYPASS_KEY);
+  return data || null;
+}
+
+// Set a bypass for a domain (5 minutes)
+export async function setBypass(domain, durationMinutes = 5) {
+  const expiry = Date.now() + durationMinutes * 60 * 1000;
+  const bypass = { domain, expiry };
+  await setStorageData(BYPASS_KEY, bypass);
+  return bypass;
+}
+
+// Clear bypass
+export async function clearBypass() {
+  await setStorageData(BYPASS_KEY, null);
+}
+
+// Check if a domain is currently bypassed
+export async function isdomainBypassed(domain) {
+  const bypass = await getActiveBypass();
+  if (!bypass) return false;
+
+  // Check if bypass is expired
+  if (Date.now() > bypass.expiry) {
+    await clearBypass();
+    return false;
+  }
+
+  // Check if domain matches (exact or subdomain)
+  const bypassDomain = bypass.domain.toLowerCase();
+  const checkDomain = domain.toLowerCase();
+  return (
+    checkDomain === bypassDomain || checkDomain.endsWith('.' + bypassDomain)
+  );
 }
 
 export { STORAGE_KEYS, getTodayKey };

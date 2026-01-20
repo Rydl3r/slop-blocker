@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -127,6 +127,97 @@
           </div>
         </section>
       </main>
+
+      <!-- Edit Modal -->
+      <div id="editModal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Edit Block Rule</h2>
+            <button id="closeEditModal" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="editPattern">Website to Block</label>
+              <input
+                type="text"
+                id="editPattern"
+                placeholder="e.g., twitter.com or youtube.com/shorts/*"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editRuleType">Match Type</label>
+              <select id="editRuleType">
+                <option value="domain">Domain (blocks entire site)</option>
+                <option value="url">URL Pattern (with wildcards)</option>
+                <option value="regex">Regular Expression</option>
+              </select>
+            </div>
+
+            <!-- Time Schedule Section -->
+            <div class="form-group">
+              <label class="schedule-toggle-label">
+                <input type="checkbox" id="editEnableSchedule" />
+                <span>Enable time-based blocking</span>
+              </label>
+            </div>
+
+            <div id="editScheduleOptions" class="schedule-options hidden">
+              <div class="form-row">
+                <div class="form-group half">
+                  <label for="editStartTime">Start Time</label>
+                  <input type="time" id="editStartTime" value="09:00" />
+                </div>
+                <div class="form-group half">
+                  <label for="editEndTime">End Time</label>
+                  <input type="time" id="editEndTime" value="18:00" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Active Days</label>
+                <div class="days-selector">
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="0" />
+                    <span>Sun</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="1" checked />
+                    <span>Mon</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="2" checked />
+                    <span>Tue</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="3" checked />
+                    <span>Wed</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="4" checked />
+                    <span>Thu</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="5" checked />
+                    <span>Fri</span>
+                  </label>
+                  <label class="day-checkbox">
+                    <input type="checkbox" name="editDays" value="6" />
+                    <span>Sat</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div id="editError" class="error-message hidden"></div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelEdit" class="btn btn-secondary">Cancel</button>
+            <button id="saveEdit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </div>
+      </div>
 
       <footer>
         <p>Slop Blocker v1.0.0 • Stay focused! 💪</p>

@@ -54,13 +54,6 @@ function startTracking(domain) {
   startTime = Date.now();
   isTracking = true;
 
-  // Record the visit immediately (this triggers slippage recording)
-  safeSendMessage({
-    type: 'RECORD_VISIT',
-    domain: currentDomain,
-    url: window.location.href,
-  });
-
   // Send time updates every 5 seconds for accurate tracking
   trackingInterval = setInterval(() => {
     sendTimeUpdate();

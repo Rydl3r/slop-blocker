@@ -71,7 +71,7 @@ function updateProgressRing(streak) {
 
   // Update message based on streak
   const messageObj = progressMessages.find(
-    (p) => streak >= p.min && streak <= p.max
+    (p) => streak >= p.min && streak <= p.max,
   );
   document.getElementById('progressMessage').textContent =
     messageObj?.message || 'Keep going!';
@@ -98,17 +98,20 @@ async function recordBlock(domain) {
   }
 }
 
+// Store the blocked info for use by bypass button
+let currentBlockedInfo = null;
+
 // Load and display stats
 async function loadStats() {
   try {
     // Get blocked info from background
     const blockedInfo = await getBlockedInfo();
+    currentBlockedInfo = blockedInfo;
     const blockedDomain = blockedInfo?.domain || 'This site';
 
     // Display blocked domain
-    document.getElementById(
-      'blockedDomain'
-    ).textContent = `${blockedDomain} has been blocked`;
+    document.getElementById('blockedDomain').textContent =
+      `${blockedDomain} has been blocked`;
 
     // Record the block
     await recordBlock(blockedDomain);
@@ -127,7 +130,7 @@ async function loadStats() {
     // Time wasted on blocked sites today
     const timeWasted = Object.values(todayStats.timeSpent || {}).reduce(
       (a, b) => a + b,
-      0
+      0,
     );
     document.getElementById('timeWasted').textContent = formatTime(timeWasted);
 
@@ -150,3 +153,49 @@ document.getElementById('goBack').addEventListener('click', () => {
     window.close();
   }
 });
+
+// Temporary bypass button
+document
+  .getElementById('temporaryBypass')
+  .addEventListener('click', async () => {
+    const domain = currentBlockedInfo?.domain;
+    const originalUrl = currentBlockedInfo?.url;
+
+    if (!domain) {
+      alert('Could not determine the blocked domain. Please try again.');
+      return;
+    }
+
+    // Confirm with the user
+    const confirmed = confirm(
+      `Are you sure you want to temporarily disable blocking for ${domain}?\n\n` +
+        `This will:\n` +
+        `• Reset your current streak to 0\n` +
+        `• Record a slippage\n` +
+        `• Allow access for 5 minutes\n\n` +
+        `You will regret this. Are you sure?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Send message to background to enable bypass
+      const result = await chrome.runtime.sendMessage({
+        type: 'TEMPORARY_BYPASS',
+        domain: domain,
+        originalUrl: originalUrl,
+      });
+
+      if (result?.success) {
+        // Redirect to the original URL
+        const redirectUrl =
+          result.redirectUrl || originalUrl || `https://${domain}`;
+        window.location.href = redirectUrl;
+      } else {
+        alert('Failed to enable bypass. Please try again.');
+      }
+    } catch (e) {
+      console.error('Error enabling bypass:', e);
+      alert('An error occurred. Please try again.');
+    }
+  });

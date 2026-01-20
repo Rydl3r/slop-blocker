@@ -5,8 +5,12 @@ import {
   getSettings,
   recordBlockAttempt,
   recordTimeSpent,
-  recordSlippage,
-  updateStreak,
+  recordSlippageAndResetStreak,
+  incrementStreak,
+  setBypass,
+  getActiveBypass,
+  clearBypass,
+  isdomainBypassed,
 } from '../utils/storage.js';
 import {
   matchesRule,
@@ -23,14 +27,14 @@ const lastBlockedByTab = new Map();
 // Initialize extension
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('Slop Blocker installed');
-  await updateStreak();
+  await incrementStreak();
   await updateBlockingRules();
   setupScheduleAlarm();
 });
 
 // Update streak on startup
 chrome.runtime.onStartup.addListener(async () => {
-  await updateStreak();
+  await incrementStreak();
   await updateBlockingRules();
   setupScheduleAlarm();
 });
@@ -41,10 +45,18 @@ function setupScheduleAlarm() {
   chrome.alarms.create('updateScheduledRules', { periodInMinutes: 1 });
 }
 
-// Listen for alarm to update time-based rules and streak
+// Listen for alarm to update time-based rules, streak, and bypass expiry
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'updateScheduledRules') {
-    await updateStreak(); // Update streak daily
+    await incrementStreak(); // Increment streak once per day
+
+    // Check for expired bypass and update rules accordingly
+    const bypass = await getActiveBypass();
+    if (bypass && Date.now() > bypass.expiry) {
+      await clearBypass();
+      console.log('Bypass expired, re-enabling blocking');
+    }
+
     await updateBlockingRules();
   }
 });
@@ -139,32 +151,38 @@ async function handleMessage(message, sender) {
     case 'CHECK_SITE':
       // Check if the domain/URL is in the block list and within schedule
       const checkRules = await getRules();
-      const isBlocked = checkRules.some(
-        (rule) => matchesRule(message.url, rule) && isWithinSchedule(rule),
-      );
-      return { isBlocked, domain: message.domain };
-
-    case 'RECORD_VISIT':
-      // Record a visit to a blocked site immediately (triggers slippage)
-      if (message.domain) {
-        const visitRules = await getRules();
-        const isBlockedSite = visitRules.some(
-          (rule) =>
-            matchesRule(message.url || `https://${message.domain}`, rule) &&
-            isWithinSchedule(rule),
+      // Also check if domain is currently bypassed
+      const isBypassed = await isdomainBypassed(message.domain);
+      const isBlocked =
+        !isBypassed &&
+        checkRules.some(
+          (rule) => matchesRule(message.url, rule) && isWithinSchedule(rule),
         );
-        if (isBlockedSite) {
-          const result = await recordSlippage(message.domain);
-          return { success: true, ...result };
-        }
+      return { isBlocked, domain: message.domain, isBypassed };
+
+    case 'TEMPORARY_BYPASS':
+      // User clicked the temporary disable button - reset streak, record slippage, enable bypass
+      if (message.domain) {
+        // Record slippage and reset streak
+        const result = await recordSlippageAndResetStreak(message.domain);
+
+        // Set bypass for 5 minutes
+        const bypass = await setBypass(message.domain, 5);
+
+        // Update blocking rules to exclude bypassed domain
+        await updateBlockingRules();
+
+        return {
+          success: true,
+          ...result,
+          bypassExpiry: bypass.expiry,
+          redirectUrl: message.originalUrl || `https://${message.domain}`,
+        };
       }
       return { success: false };
 
     case 'RECORD_TIME':
       // Record time spent on a blocked site
-      // Re-verify that the site is still within the blocked schedule
-      // This prevents streak from being broken if user stays on a page
-      // past the scheduled blocking hours
       if (message.domain && message.seconds > 0 && message.isBlocked) {
         const timeRules = await getRules();
         const stillBlocked = timeRules.some(
@@ -182,8 +200,8 @@ async function handleMessage(message, sender) {
       return { success: false };
 
     case 'GET_STATS':
-      // Update streak first, then return current stats
-      await updateStreak();
+      // Ensure streak is incremented for today, then return current stats
+      await incrementStreak();
       const { getStats: fetchStats, getTodayKey: getToday } =
         await import('../utils/storage.js');
       const currentStats = await fetchStats();
@@ -200,6 +218,7 @@ async function handleMessage(message, sender) {
 async function updateBlockingRules() {
   const settings = await getSettings();
   const rules = await getRules();
+  const bypass = await getActiveBypass();
 
   // Get existing dynamic rules
   const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
@@ -218,8 +237,34 @@ async function updateBlockingRules() {
     return;
   }
 
+  // Check if bypass is still active
+  const activeBypassDomain =
+    bypass && Date.now() < bypass.expiry ? bypass.domain.toLowerCase() : null;
+  if (activeBypassDomain) {
+    console.log(
+      `Bypass active for ${activeBypassDomain} until ${new Date(bypass.expiry).toLocaleTimeString()}`,
+    );
+  }
+
   // Create new rules for enabled block rules that are within their schedule
-  const enabledRules = rules.filter((r) => r.enabled && isWithinSchedule(r));
+  // Filter out bypassed domains
+  const enabledRules = rules.filter((r) => {
+    if (!r.enabled || !isWithinSchedule(r)) return false;
+
+    // If there's an active bypass, skip rules that match the bypassed domain
+    if (activeBypassDomain) {
+      const ruleDomain = r.pattern.replace(/^\*\./, '').toLowerCase();
+      if (
+        ruleDomain === activeBypassDomain ||
+        activeBypassDomain.endsWith('.' + ruleDomain)
+      ) {
+        console.log(`Skipping rule for ${ruleDomain} due to active bypass`);
+        return false;
+      }
+    }
+    return true;
+  });
+
   const newRules = enabledRules.map((rule, index) => {
     const ruleId = ruleIdCounter + index;
 

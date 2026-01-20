@@ -5,8 +5,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    sans-serif;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   min-height: 100vh;
   display: flex;
@@ -239,6 +240,36 @@ cite::before {
 .btn-secondary:hover {
   background: rgba(100, 255, 218, 0.1);
   transform: translateY(-2px);
+}
+
+/* Bypass Section */
+.bypass-section {
+  margin-top: 30px;
+  padding-top: 25px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-bypass {
+  background: transparent;
+  color: #ff9800;
+  border: 1px solid #ff9800;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.btn-bypass:hover {
+  background: rgba(255, 152, 0, 0.1);
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.bypass-warning {
+  margin-top: 10px;
+  color: #ff9800;
+  font-size: 0.8rem;
+  opacity: 0.7;
 }
 
 .reminder {
