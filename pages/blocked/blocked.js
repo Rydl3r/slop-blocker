@@ -1,40 +1,7 @@
 import { getRandomQuote } from '../../utils/quotes.js';
-import { getStats, getTodayKey } from '../../utils/storage.js';
-
-// Motivational tips
-const tips = [
-  'Take 3 deep breaths before deciding what to do next.',
-  "What's one small task you could accomplish right now?",
-  'Stand up and stretch for 30 seconds - your body will thank you.',
-  'Consider: Is there something more meaningful you could be doing?',
-  'Remember your goals. Every moment is a choice.',
-  'Try the 2-minute rule: If something takes less than 2 minutes, do it now.',
-  'Your future self is watching. Make them proud.',
-  "Progress, not perfection. What's one step forward you can take?",
-  'Boredom is often a sign you need to challenge yourself.',
-  'The urge will pass. Give it 5 minutes.',
-  'What would you do if you weren’t afraid of failing?',
-  'Focus on what you can control right now.',
-  'Remember why you started this journey.',
-  'Small consistent actions lead to big changes over time.',
-  'Take a moment to visualize your success.',
-  'Celebrate small wins - they add up!',
-  'Ask yourself: Is this activity aligned with my values?',
-  'Try the Pomodoro technique: 25 minutes focused work, 5 minutes break.',
-  'Disconnect to reconnect - take a short walk outside.',
-  'Reflect on your progress so far. You’re doing great!',
-];
-
-// Progress messages based on streak
-const progressMessages = [
-  { min: 0, max: 0, message: 'Start your journey today!' },
-  { min: 1, max: 2, message: 'Great start! Keep building momentum.' },
-  { min: 3, max: 6, message: "You're building a habit!" },
-  { min: 7, max: 13, message: 'One week strong! 💪' },
-  { min: 14, max: 29, message: "Two weeks! You're crushing it!" },
-  { min: 30, max: 59, message: 'A full month! Incredible discipline!' },
-  { min: 60, max: Infinity, message: "You're unstoppable! 🏆" },
-];
+import { getStats } from '../../utils/storage.js';
+import { formatTime, getTodayKey } from '../../utils/helpers.js';
+import { getRandomTip, getProgressMessage } from '../../utils/constants.js';
 
 // Display random quote
 const quote = getRandomQuote();
@@ -42,17 +9,7 @@ document.getElementById('quoteText').textContent = `"${quote.text}"`;
 document.getElementById('quoteAuthor').textContent = quote.author;
 
 // Display random tip
-const tipText = tips[Math.floor(Math.random() * tips.length)];
-document.getElementById('tipText').textContent = tipText;
-
-// Format seconds to readable time
-function formatTime(seconds) {
-  if (!seconds || seconds < 60) return '0m';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-}
+document.getElementById('tipText').textContent = getRandomTip();
 
 // Update progress ring
 function updateProgressRing(streak) {
@@ -70,11 +27,8 @@ function updateProgressRing(streak) {
   document.getElementById('streakValue').textContent = streak;
 
   // Update message based on streak
-  const messageObj = progressMessages.find(
-    (p) => streak >= p.min && streak <= p.max,
-  );
   document.getElementById('progressMessage').textContent =
-    messageObj?.message || 'Keep going!';
+    getProgressMessage(streak);
 }
 
 // Get the blocked domain info from background script

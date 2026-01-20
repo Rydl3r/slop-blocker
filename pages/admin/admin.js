@@ -7,6 +7,11 @@ import {
   saveSettings,
 } from '../../utils/storage.js';
 import { validatePattern } from '../../utils/patterns.js';
+import {
+  escapeHtml,
+  formatDays,
+  getRuleTypeLabel,
+} from '../../utils/helpers.js';
 
 // DOM Elements
 const globalToggle = document.getElementById('globalToggle');
@@ -54,7 +59,7 @@ function renderRules(rules) {
       <div class="rule-info">
         <div class="rule-pattern">${escapeHtml(rule.pattern)}</div>
         <div class="rule-meta">
-          <span class="rule-type">${getTypeLabel(rule.type)}</span>
+          <span class="rule-type">${getRuleTypeLabel(rule.type)}</span>
           ${
             rule.schedule?.enabled
               ? `<span class="rule-schedule">⏰ ${rule.schedule.startTime} - ${rule.schedule.endTime} (${formatDays(rule.schedule.days)})</span>`
@@ -78,63 +83,16 @@ function renderRules(rules) {
     item.querySelector('.edit-rule').addEventListener('click', async () => {
       const rules = await getRules();
       const rule = rules.find((r) => r.id === id);
-      if (rule) {
-        openEditModal(rule);
-      }
+      if (rule) openEditModal(rule);
     });
 
     item.querySelector('.delete-rule').addEventListener('click', async () => {
-      if (confirm('Are you sure you want to delete this rule?')) {
-        await deleteRule(id);
-        await loadRules();
-        notifyBackgroundUpdate();
-      }
+      if (!confirm('Are you sure you want to delete this rule?')) return;
+      await deleteRule(id);
+      await loadRules();
+      notifyBackgroundUpdate();
     });
   });
-}
-
-// Format days array to readable string
-function formatDays(days) {
-  if (!days || days.length === 0) return 'No days';
-  if (days.length === 7) return 'Every day';
-
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const weekdays = [1, 2, 3, 4, 5];
-  const weekend = [0, 6];
-
-  if (
-    weekdays.every((d) => days.includes(d)) &&
-    !days.includes(0) &&
-    !days.includes(6)
-  ) {
-    return 'Weekdays';
-  }
-  if (weekend.every((d) => days.includes(d)) && days.length === 2) {
-    return 'Weekends';
-  }
-
-  return days.map((d) => dayNames[d]).join(', ');
-}
-
-// Get human-readable type label
-function getTypeLabel(type) {
-  switch (type) {
-    case 'domain':
-      return 'Entire domain';
-    case 'url':
-      return 'URL pattern';
-    case 'regex':
-      return 'Regular expression';
-    default:
-      return type;
-  }
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // Setup event listeners
@@ -222,44 +180,66 @@ function notifyBackgroundUpdate() {
 // Edit Modal Functions
 let currentEditId = null;
 
+// Default schedule values
+const DEFAULT_SCHEDULE = {
+  startTime: '09:00',
+  endTime: '18:00',
+  days: [1, 2, 3, 4, 5], // Weekdays
+};
+
+// Helper: Populate schedule form fields
+function populateScheduleForm(schedule, prefix = 'edit') {
+  const hasSchedule = schedule?.enabled;
+  const scheduleData = hasSchedule ? schedule : DEFAULT_SCHEDULE;
+
+  document.getElementById(`${prefix}EnableSchedule`).checked = hasSchedule;
+  document
+    .getElementById(`${prefix}ScheduleOptions`)
+    .classList.toggle('hidden', !hasSchedule);
+  document.getElementById(`${prefix}StartTime`).value = scheduleData.startTime;
+  document.getElementById(`${prefix}EndTime`).value = scheduleData.endTime;
+
+  const activeDays = hasSchedule ? schedule.days || [] : DEFAULT_SCHEDULE.days;
+  document
+    .querySelectorAll(`#${prefix}ScheduleOptions input[name="${prefix}Days"]`)
+    .forEach((cb) => {
+      cb.checked = activeDays.includes(parseInt(cb.value));
+    });
+}
+
+// Helper: Get schedule from form
+function getScheduleFromForm(prefix = 'edit') {
+  const enabled = document.getElementById(`${prefix}EnableSchedule`).checked;
+  if (!enabled) return null;
+
+  const selectedDays = Array.from(
+    document.querySelectorAll(
+      `#${prefix}ScheduleOptions input[name="${prefix}Days"]:checked`,
+    ),
+  ).map((cb) => parseInt(cb.value));
+
+  return {
+    enabled: true,
+    startTime: document.getElementById(`${prefix}StartTime`).value,
+    endTime: document.getElementById(`${prefix}EndTime`).value,
+    days: selectedDays,
+  };
+}
+
+// Helper: Show edit error
+function showEditError(message) {
+  const errorEl = document.getElementById('editError');
+  errorEl.textContent = message;
+  errorEl.classList.remove('hidden');
+}
+
 function openEditModal(rule) {
   currentEditId = rule.id;
 
-  // Populate form fields
   document.getElementById('editPattern').value = rule.pattern;
   document.getElementById('editRuleType').value = rule.type;
+  populateScheduleForm(rule.schedule);
 
-  const editEnableSchedule = document.getElementById('editEnableSchedule');
-  const editScheduleOptions = document.getElementById('editScheduleOptions');
-
-  if (rule.schedule?.enabled) {
-    editEnableSchedule.checked = true;
-    editScheduleOptions.classList.remove('hidden');
-    document.getElementById('editStartTime').value =
-      rule.schedule.startTime || '09:00';
-    document.getElementById('editEndTime').value =
-      rule.schedule.endTime || '18:00';
-
-    // Set days
-    document
-      .querySelectorAll('#editScheduleOptions input[name="editDays"]')
-      .forEach((cb) => {
-        cb.checked = rule.schedule.days?.includes(parseInt(cb.value)) || false;
-      });
-  } else {
-    editEnableSchedule.checked = false;
-    editScheduleOptions.classList.add('hidden');
-    // Reset to defaults
-    document.getElementById('editStartTime').value = '09:00';
-    document.getElementById('editEndTime').value = '18:00';
-    document
-      .querySelectorAll('#editScheduleOptions input[name="editDays"]')
-      .forEach((cb, i) => {
-        cb.checked = [1, 2, 3, 4, 5].includes(parseInt(cb.value)); // Default: weekdays
-      });
-  }
-
-  // Show modal
   document.getElementById('editModal').classList.add('active');
   document.getElementById('editError').classList.add('hidden');
 }
@@ -272,54 +252,35 @@ function closeEditModal() {
 async function saveEditedRule() {
   const pattern = document.getElementById('editPattern').value.trim();
   const type = document.getElementById('editRuleType').value;
-  const editEnableSchedule = document.getElementById('editEnableSchedule');
 
   // Validate pattern
   const validation = validatePattern(pattern, type);
   if (!validation.valid) {
-    document.getElementById('editError').textContent = validation.error;
-    document.getElementById('editError').classList.remove('hidden');
+    showEditError(validation.error);
     return;
   }
 
   // Check for duplicates (excluding current rule)
   const rules = await getRules();
-  if (
-    rules.some(
-      (r) =>
-        r.id !== currentEditId &&
-        r.pattern.toLowerCase() === pattern.toLowerCase(),
-    )
-  ) {
-    document.getElementById('editError').textContent =
-      'This pattern is already blocked';
-    document.getElementById('editError').classList.remove('hidden');
+  const isDuplicate = rules.some(
+    (r) =>
+      r.id !== currentEditId &&
+      r.pattern.toLowerCase() === pattern.toLowerCase(),
+  );
+
+  if (isDuplicate) {
+    showEditError('This pattern is already blocked');
     return;
   }
 
-  // Build update object
-  const updates = { pattern, type };
+  // Build and save update
+  const updates = {
+    pattern,
+    type,
+    schedule: getScheduleFromForm(),
+  };
 
-  if (editEnableSchedule.checked) {
-    const selectedDays = Array.from(
-      document.querySelectorAll(
-        '#editScheduleOptions input[name="editDays"]:checked',
-      ),
-    ).map((cb) => parseInt(cb.value));
-
-    updates.schedule = {
-      enabled: true,
-      startTime: document.getElementById('editStartTime').value,
-      endTime: document.getElementById('editEndTime').value,
-      days: selectedDays,
-    };
-  } else {
-    updates.schedule = null;
-  }
-
-  // Update the rule
   await updateRule(currentEditId, updates);
-
   closeEditModal();
   await loadRules();
   notifyBackgroundUpdate();

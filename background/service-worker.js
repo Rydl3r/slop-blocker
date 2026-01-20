@@ -3,6 +3,7 @@
 import {
   getRules,
   getSettings,
+  getStats,
   recordBlockAttempt,
   recordTimeSpent,
   recordSlippageAndResetStreak,
@@ -10,8 +11,10 @@ import {
   setBypass,
   getActiveBypass,
   clearBypass,
-  isdomainBypassed,
+  isDomainBypassed,
+  toggleEnabled,
 } from '../utils/storage.js';
+import { getTodayKey } from '../utils/helpers.js';
 import {
   matchesRule,
   extractDomain,
@@ -111,107 +114,129 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // Keep channel open for async response
 });
 
+// Message handlers map
+const messageHandlers = {
+  GET_RULES: () => getRules(),
+  GET_SETTINGS: () => getSettings(),
+
+  async UPDATE_RULES() {
+    await updateBlockingRules();
+    return { success: true };
+  },
+
+  async TOGGLE_ENABLED() {
+    const settings = await toggleEnabled();
+    await updateBlockingRules();
+    return settings;
+  },
+
+  async RECORD_BLOCK({ domain }) {
+    if (!domain) return { success: false };
+    await recordBlockAttempt(domain);
+    return { success: true };
+  },
+
+  GET_LAST_BLOCKED(_, sender) {
+    const tabId = sender.tab?.id;
+    if (!tabId || !lastBlockedByTab.has(tabId)) return null;
+    const info = lastBlockedByTab.get(tabId);
+    return Date.now() - info.timestamp < 30000 ? info : null;
+  },
+
+  async CHECK_SITE({ url, domain }) {
+    const rules = await getRules();
+    const isBypassed = await isDomainBypassed(domain);
+    const isBlocked =
+      !isBypassed &&
+      rules.some((rule) => matchesRule(url, rule) && isWithinSchedule(rule));
+    return { isBlocked, domain, isBypassed };
+  },
+
+  async TEMPORARY_BYPASS({ domain, originalUrl }) {
+    if (!domain) return { success: false };
+    const result = await recordSlippageAndResetStreak(domain);
+    const bypass = await setBypass(domain, 5);
+    await updateBlockingRules();
+    return {
+      success: true,
+      ...result,
+      bypassExpiry: bypass.expiry,
+      redirectUrl: originalUrl || `https://${domain}`,
+    };
+  },
+
+  async RECORD_TIME({ domain, url, seconds, isBlocked }) {
+    if (!domain || seconds <= 0 || !isBlocked) {
+      return { success: false };
+    }
+    const rules = await getRules();
+    const stillBlocked = rules.some(
+      (rule) =>
+        matchesRule(url || `https://${domain}`, rule) && isWithinSchedule(rule),
+    );
+    if (!stillBlocked) return { success: false, stillBlocked: false };
+    await recordTimeSpent(domain, seconds);
+    return { success: true, stillBlocked: true };
+  },
+
+  async GET_STATS() {
+    await incrementStreak();
+    const stats = await getStats();
+    return { stats, today: getTodayKey() };
+  },
+};
+
 async function handleMessage(message, sender) {
-  switch (message.type) {
-    case 'GET_RULES':
-      return await getRules();
-
-    case 'GET_SETTINGS':
-      return await getSettings();
-
-    case 'UPDATE_RULES':
-      await updateBlockingRules();
-      return { success: true };
-
-    case 'TOGGLE_ENABLED':
-      const { toggleEnabled } = await import('../utils/storage.js');
-      const settings = await toggleEnabled();
-      await updateBlockingRules();
-      return settings;
-
-    case 'RECORD_BLOCK':
-      if (message.domain) {
-        await recordBlockAttempt(message.domain);
-        return { success: true };
-      }
-      return { success: false };
-
-    case 'GET_LAST_BLOCKED':
-      // Get the blocked info for the sender's tab
-      const tabId = sender.tab?.id;
-      if (tabId && lastBlockedByTab.has(tabId)) {
-        const info = lastBlockedByTab.get(tabId);
-        // Only return if recent (within 30 seconds)
-        if (Date.now() - info.timestamp < 30000) {
-          return info;
-        }
-      }
-      return null;
-
-    case 'CHECK_SITE':
-      // Check if the domain/URL is in the block list and within schedule
-      const checkRules = await getRules();
-      // Also check if domain is currently bypassed
-      const isBypassed = await isdomainBypassed(message.domain);
-      const isBlocked =
-        !isBypassed &&
-        checkRules.some(
-          (rule) => matchesRule(message.url, rule) && isWithinSchedule(rule),
-        );
-      return { isBlocked, domain: message.domain, isBypassed };
-
-    case 'TEMPORARY_BYPASS':
-      // User clicked the temporary disable button - reset streak, record slippage, enable bypass
-      if (message.domain) {
-        // Record slippage and reset streak
-        const result = await recordSlippageAndResetStreak(message.domain);
-
-        // Set bypass for 5 minutes
-        const bypass = await setBypass(message.domain, 5);
-
-        // Update blocking rules to exclude bypassed domain
-        await updateBlockingRules();
-
-        return {
-          success: true,
-          ...result,
-          bypassExpiry: bypass.expiry,
-          redirectUrl: message.originalUrl || `https://${message.domain}`,
-        };
-      }
-      return { success: false };
-
-    case 'RECORD_TIME':
-      // Record time spent on a blocked site
-      if (message.domain && message.seconds > 0 && message.isBlocked) {
-        const timeRules = await getRules();
-        const stillBlocked = timeRules.some(
-          (rule) =>
-            matchesRule(message.url || `https://${message.domain}`, rule) &&
-            isWithinSchedule(rule),
-        );
-        if (stillBlocked) {
-          await recordTimeSpent(message.domain, message.seconds);
-          return { success: true, stillBlocked: true };
-        }
-        // Site is no longer in blocked schedule - don't record time
-        return { success: false, stillBlocked: false };
-      }
-      return { success: false };
-
-    case 'GET_STATS':
-      // Ensure streak is incremented for today, then return current stats
-      await incrementStreak();
-      const { getStats: fetchStats, getTodayKey: getToday } =
-        await import('../utils/storage.js');
-      const currentStats = await fetchStats();
-      const todayKey = getToday();
-      return { stats: currentStats, today: todayKey };
-
-    default:
-      console.warn('Unknown message type:', message.type);
-      return null;
+  const handler = messageHandlers[message.type];
+  if (!handler) {
+    console.warn('Unknown message type:', message.type);
+    return null;
   }
+  return handler(message, sender);
+}
+
+// Check if a rule should be skipped due to active bypass
+function shouldSkipForBypass(rule, bypassDomain) {
+  if (!bypassDomain) return false;
+  const ruleDomain = rule.pattern.replace(/^\*\./, '').toLowerCase();
+  return ruleDomain === bypassDomain || bypassDomain.endsWith('.' + ruleDomain);
+}
+
+// Build a declarativeNetRequest rule from our stored rule
+function buildBlockingRule(rule, ruleId) {
+  const baseAction = {
+    type: 'redirect',
+    redirect: { extensionPath: '/pages/blocked/blocked.html' },
+  };
+
+  // Regex rules use regexFilter
+  if (rule.type === 'regex') {
+    return {
+      id: ruleId,
+      priority: 1,
+      action: baseAction,
+      condition: {
+        regexFilter: rule.pattern,
+        resourceTypes: ['main_frame'],
+      },
+    };
+  }
+
+  // Domain and URL rules use urlFilter
+  const urlFilter =
+    rule.type === 'domain'
+      ? `||${rule.pattern.replace(/^\*\./, '')}`
+      : rule.pattern;
+
+  return {
+    id: ruleId,
+    priority: 1,
+    action: baseAction,
+    condition: {
+      urlFilter,
+      resourceTypes: ['main_frame'],
+    },
+  };
 }
 
 // Update the declarativeNetRequest rules based on stored rules
@@ -220,95 +245,40 @@ async function updateBlockingRules() {
   const rules = await getRules();
   const bypass = await getActiveBypass();
 
-  // Get existing dynamic rules
+  // Remove all existing dynamic rules
   const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-  const existingRuleIds = existingRules.map((r) => r.id);
-
-  // Remove all existing rules
-  if (existingRuleIds.length > 0) {
+  if (existingRules.length > 0) {
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: existingRuleIds,
+      removeRuleIds: existingRules.map((r) => r.id),
     });
   }
 
-  // If blocking is disabled, don't add new rules
   if (!settings.enabled) {
     console.log('Blocking disabled');
     return;
   }
 
-  // Check if bypass is still active
+  // Determine active bypass domain
   const activeBypassDomain =
     bypass && Date.now() < bypass.expiry ? bypass.domain.toLowerCase() : null;
+
   if (activeBypassDomain) {
     console.log(
       `Bypass active for ${activeBypassDomain} until ${new Date(bypass.expiry).toLocaleTimeString()}`,
     );
   }
 
-  // Create new rules for enabled block rules that are within their schedule
-  // Filter out bypassed domains
-  const enabledRules = rules.filter((r) => {
-    if (!r.enabled || !isWithinSchedule(r)) return false;
+  // Filter and build rules
+  const enabledRules = rules.filter(
+    (r) =>
+      r.enabled &&
+      isWithinSchedule(r) &&
+      !shouldSkipForBypass(r, activeBypassDomain),
+  );
 
-    // If there's an active bypass, skip rules that match the bypassed domain
-    if (activeBypassDomain) {
-      const ruleDomain = r.pattern.replace(/^\*\./, '').toLowerCase();
-      if (
-        ruleDomain === activeBypassDomain ||
-        activeBypassDomain.endsWith('.' + ruleDomain)
-      ) {
-        console.log(`Skipping rule for ${ruleDomain} due to active bypass`);
-        return false;
-      }
-    }
-    return true;
-  });
-
-  const newRules = enabledRules.map((rule, index) => {
-    const ruleId = ruleIdCounter + index;
-
-    // Build URL filter based on rule type
-    let urlFilter;
-    if (rule.type === 'domain') {
-      // Remove leading wildcard for urlFilter format
-      const domain = rule.pattern.replace(/^\*\./, '');
-      urlFilter = `||${domain}`;
-    } else if (rule.type === 'url') {
-      urlFilter = rule.pattern;
-    } else {
-      // For regex, use regexFilter instead
-      return {
-        id: ruleId,
-        priority: 1,
-        action: {
-          type: 'redirect',
-          redirect: {
-            extensionPath: '/pages/blocked/blocked.html',
-          },
-        },
-        condition: {
-          regexFilter: rule.pattern,
-          resourceTypes: ['main_frame'],
-        },
-      };
-    }
-
-    return {
-      id: ruleId,
-      priority: 1,
-      action: {
-        type: 'redirect',
-        redirect: {
-          extensionPath: '/pages/blocked/blocked.html',
-        },
-      },
-      condition: {
-        urlFilter: urlFilter,
-        resourceTypes: ['main_frame'],
-      },
-    };
-  });
+  const newRules = enabledRules.map((rule, index) =>
+    buildBlockingRule(rule, ruleIdCounter + index),
+  );
 
   // Add new rules
   if (newRules.length > 0) {

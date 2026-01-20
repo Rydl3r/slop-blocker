@@ -1,25 +1,25 @@
-import { getStats, getTodayKey } from '../../utils/storage.js';
+import { getStats } from '../../utils/storage.js';
+import { escapeHtml, formatTime, getTodayKey } from '../../utils/helpers.js';
+import { CHART_COLORS } from '../../utils/constants.js';
 
-// Color palette
-const colors = {
-  primary: '#64ffda',
-  danger: '#e94560',
-  warning: '#ffd93d',
-  purple: '#a855f7',
-  blue: '#3b82f6',
-  orange: '#f97316',
-  pink: '#ec4899',
-  cyan: '#06b6d4',
-  gradient: [
-    '#e94560',
-    '#f97316',
-    '#ffd93d',
-    '#64ffda',
-    '#3b82f6',
-    '#a855f7',
-    '#ec4899',
-    '#06b6d4',
-  ],
+// Use shared color palette
+const colors = CHART_COLORS;
+
+// Common chart options
+const baseChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+};
+
+const defaultScales = {
+  y: {
+    beginAtZero: true,
+    ticks: { stepSize: 1 },
+    grid: { color: 'rgba(255,255,255,0.05)' },
+  },
+  x: {
+    grid: { display: false },
+  },
 };
 
 // DOM Elements
@@ -77,17 +77,6 @@ function setupPeriodSelectors() {
   });
 }
 
-// Format seconds to readable time
-function formatTime(seconds) {
-  if (!seconds || seconds === 0) return '0s';
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  if (seconds < 3600)
-    return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-}
-
 // Format seconds to hours (for charts)
 function toHours(seconds) {
   return Math.round(seconds / 360) / 10; // One decimal
@@ -134,98 +123,101 @@ function renderStats(stats) {
 }
 
 // Update a specific chart
+const chartRenderers = {
+  blocks: renderBlockAttemptsChart,
+  time: renderBrowsingTimeChart,
+};
+
 function updateChart(chartType, dailyStats, period) {
-  switch (chartType) {
-    case 'blocks':
-      renderBlockAttemptsChart(dailyStats, period);
-      break;
-    case 'time':
-      renderBrowsingTimeChart(dailyStats, period);
-      break;
-  }
+  chartRenderers[chartType]?.(dailyStats, period);
+}
+
+// Helper: Sum stats for a date key
+function sumDayStats(dailyStats, dateKey) {
+  const dayStats = dailyStats[dateKey] || {};
+  return {
+    attempts: dayStats.blockAttempts || 0,
+    blockedTime: Object.values(dayStats.timeSpent || {}).reduce(
+      (a, b) => a + b,
+      0,
+    ),
+  };
+}
+
+// Helper: Aggregate stats over a date range
+function aggregateRange(dailyStats, dates) {
+  return dates.reduce(
+    (acc, date) => {
+      const key = date.toISOString().split('T')[0];
+      const stats = sumDayStats(dailyStats, key);
+      acc.attempts += stats.attempts;
+      acc.blockedTime += stats.blockedTime;
+      return acc;
+    },
+    { attempts: 0, blockedTime: 0 },
+  );
+}
+
+// Helper: Generate array of dates
+function getDatesInRange(startDate, count) {
+  return Array.from({ length: count }, (_, i) => {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+    return date;
+  });
 }
 
 // Get period data
 function getPeriodData(dailyStats, period) {
-  const data = [];
   const today = new Date();
 
   if (period === 'week') {
-    for (let i = 6; i >= 0; i--) {
+    return Array.from({ length: 7 }, (_, i) => {
       const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const key = date.toISOString().split('T')[0];
-      const dayStats = dailyStats[key] || {};
-
-      data.push({
+      date.setDate(date.getDate() - (6 - i));
+      const stats = sumDayStats(dailyStats, date.toISOString().split('T')[0]);
+      return {
         label: date.toLocaleDateString('en-GB', { weekday: 'short' }),
-        attempts: dayStats.blockAttempts || 0,
-        blockedTime: Object.values(dayStats.timeSpent || {}).reduce(
-          (a, b) => a + b,
-          0,
-        ),
-      });
-    }
-  } else if (period === 'month') {
-    for (let w = 3; w >= 0; w--) {
+        ...stats,
+      };
+    });
+  }
+
+  if (period === 'month') {
+    const dayOfWeek = today.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+    return Array.from({ length: 4 }, (_, i) => {
+      const w = 3 - i;
       const weekStart = new Date(today);
-      const dayOfWeek = weekStart.getDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       weekStart.setDate(weekStart.getDate() - daysToMonday - w * 7);
-
-      let attempts = 0,
-        blockedTime = 0;
-
-      for (let d = 0; d < 7; d++) {
-        const date = new Date(weekStart);
-        date.setDate(date.getDate() + d);
-        const key = date.toISOString().split('T')[0];
-        const dayStats = dailyStats[key] || {};
-
-        attempts += dayStats.blockAttempts || 0;
-        blockedTime += Object.values(dayStats.timeSpent || {}).reduce(
-          (a, b) => a + b,
-          0,
-        );
-      }
-
+      const dates = getDatesInRange(weekStart, 7);
+      const stats = aggregateRange(dailyStats, dates);
       const label =
         w === 0 ? 'This week' : w === 1 ? 'Last week' : `${w + 1}w ago`;
-      data.push({ label, attempts, blockedTime });
-    }
-  } else if (period === 'year') {
-    for (let m = 11; m >= 0; m--) {
+      return { label, ...stats };
+    });
+  }
+
+  if (period === 'year') {
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = 11 - i;
       const monthDate = new Date(today.getFullYear(), today.getMonth() - m, 1);
       const monthEnd = new Date(
         today.getFullYear(),
         today.getMonth() - m + 1,
         0,
       );
-
-      let attempts = 0,
-        blockedTime = 0;
-
-      for (let d = 1; d <= monthEnd.getDate(); d++) {
-        const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
-        const key = date.toISOString().split('T')[0];
-        const dayStats = dailyStats[key] || {};
-
-        attempts += dayStats.blockAttempts || 0;
-        blockedTime += Object.values(dayStats.timeSpent || {}).reduce(
-          (a, b) => a + b,
-          0,
-        );
-      }
-
-      data.push({
+      const dates = getDatesInRange(monthDate, monthEnd.getDate());
+      const stats = aggregateRange(dailyStats, dates);
+      return {
         label: monthDate.toLocaleDateString('en-GB', { month: 'short' }),
-        attempts,
-        blockedTime,
-      });
-    }
+        ...stats,
+      };
+    });
   }
 
-  return data;
+  return [];
 }
 
 // Top Sites Pie Chart
@@ -311,8 +303,7 @@ function renderBlockAttemptsChart(dailyStats, period) {
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...baseChartOptions,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -322,16 +313,7 @@ function renderBlockAttemptsChart(dailyStats, period) {
           },
         },
       },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { stepSize: 1 },
-          grid: { color: 'rgba(255,255,255,0.05)' },
-        },
-        x: {
-          grid: { display: false },
-        },
-      },
+      scales: defaultScales,
     },
   });
 }
@@ -364,8 +346,7 @@ function renderBrowsingTimeChart(dailyStats, period) {
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      ...baseChartOptions,
       interaction: {
         intersect: false,
         mode: 'index',
@@ -471,13 +452,6 @@ function renderSlippages(slippages) {
       `;
     })
     .join('');
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // Initialize on load

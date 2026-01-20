@@ -3,8 +3,8 @@ import {
   getRules,
   getSettings,
   saveSettings,
-  getTodayKey,
 } from '../utils/storage.js';
+import { getTodayKey } from '../utils/helpers.js';
 
 // DOM Elements
 const mainToggle = document.getElementById('mainToggle');
