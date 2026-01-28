@@ -217,6 +217,86 @@ export const quotes = [
     text: 'What lies behind us and what lies before us are tiny matters compared to what lies within us.',
     author: 'Ralph Waldo Emerson',
   },
+  {
+    text: 'Success is the sum of small efforts repeated day in and day out.',
+    author: 'Robert Collier',
+  },
+  {
+    text: 'We suffer more often in imagination than in reality.',
+    author: 'Seneca',
+  },
+  {
+    text: 'First say to yourself what you would be; and then do what you have to do.',
+    author: 'Epictetus',
+  },
+  {
+    text: 'The man who moves a mountain begins by carrying away small stones.',
+    author: 'Confucius',
+  },
+  {
+    text: 'He who has a why to live can bear almost any how.',
+    author: 'Friedrich Nietzsche',
+  },
+  {
+    text: 'Do the hard things while they are easy.',
+    author: 'Lao Tzu',
+  },
+  {
+    text: 'Well begun is half done.',
+    author: 'Aristotle',
+  },
+  {
+    text: 'The more you sweat in training, the less you bleed in battle.',
+    author: 'Richard Marcinko',
+  },
+  {
+    text: 'You do not rise to the level of your goals. You fall to the level of your systems.',
+    author: 'James Clear',
+  },
+  {
+    text: 'If it matters to you, you’ll find a way.',
+    author: 'Charlie Gilkey',
+  },
+  {
+    text: 'Hard choices, easy life. Easy choices, hard life.',
+    author: 'Jerzy Gregorek',
+  },
+  {
+    text: 'The pain of discipline is far less than the pain of regret.',
+    author: 'Sarah Bombell',
+  },
+  {
+    text: 'Do not wait for motivation. Act, and motivation will follow.',
+    author: 'Unknown',
+  },
+  {
+    text: 'Consistency is more important than intensity.',
+    author: 'Bruce Lee',
+  },
+  {
+    text: 'The cost of procrastination is the life you could have lived.',
+    author: 'Unknown',
+  },
+  {
+    text: 'Small steps every day lead to big changes over time.',
+    author: 'Unknown',
+  },
+  {
+    text: 'Discomfort is the price of growth.',
+    author: 'Unknown',
+  },
+  {
+    text: 'You can do anything, but not everything.',
+    author: 'David Allen',
+  },
+  {
+    text: 'If you’re tired of starting over, stop giving up.',
+    author: 'Unknown',
+  },
+  {
+    text: 'Success is built quietly, consistency makes the noise.',
+    author: 'Unknown',
+  },
 ];
 
 export function getRandomQuote() {
