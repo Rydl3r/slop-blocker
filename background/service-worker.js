@@ -21,9 +21,6 @@ import {
   isWithinSchedule,
 } from '../utils/patterns.js';
 
-// Dynamic rule ID counter (start high to avoid conflicts)
-let ruleIdCounter = 1000;
-
 // Store last blocked info per tab
 const lastBlockedByTab = new Map();
 
@@ -276,8 +273,9 @@ async function updateBlockingRules() {
       !shouldSkipForBypass(r, activeBypassDomain),
   );
 
+  // Use fixed IDs (1-based offset) — safe because all existing rules are removed above
   const newRules = enabledRules.map((rule, index) =>
-    buildBlockingRule(rule, ruleIdCounter + index),
+    buildBlockingRule(rule, 1000 + index),
   );
 
   // Add new rules
@@ -291,8 +289,6 @@ async function updateBlockingRules() {
       console.error('Error adding rules:', e);
     }
   }
-
-  ruleIdCounter += newRules.length;
 }
 
 // Export for testing
