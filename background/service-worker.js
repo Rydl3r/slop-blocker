@@ -23,6 +23,7 @@ import {
 
 // Store last blocked info per tab
 const lastBlockedByTab = new Map();
+let updateRulesQueue = Promise.resolve();
 
 // Initialize extension
 chrome.runtime.onInstalled.addListener(async () => {
@@ -237,7 +238,7 @@ function buildBlockingRule(rule, ruleId) {
 }
 
 // Update the declarativeNetRequest rules based on stored rules
-async function updateBlockingRules() {
+async function performBlockingRulesUpdate() {
   const settings = await getSettings();
   const rules = await getRules();
   const bypass = await getActiveBypass();
@@ -289,6 +290,13 @@ async function updateBlockingRules() {
       console.error('Error adding rules:', e);
     }
   }
+}
+
+// Serialize update calls to prevent concurrent add/remove races in DNR
+async function updateBlockingRules() {
+  const run = updateRulesQueue.then(() => performBlockingRulesUpdate());
+  updateRulesQueue = run.catch(() => {});
+  return run;
 }
 
 // Export for testing
