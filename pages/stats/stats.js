@@ -1,6 +1,6 @@
 import { getStats } from '../../utils/storage.js';
 import { escapeHtml, formatTime, getTodayKey } from '../../utils/helpers.js';
-import { CHART_COLORS } from '../../utils/constants.js';
+import { CHART_COLORS, getProgressState } from '../../utils/constants.js';
 
 // Use shared color palette
 const colors = CHART_COLORS;
@@ -25,6 +25,10 @@ const defaultScales = {
 // DOM Elements
 const currentStreakEl = document.getElementById('currentStreak');
 const longestStreakEl = document.getElementById('longestStreak');
+const progressionBadgeEl = document.getElementById('progressionBadge');
+const progressionTitleEl = document.getElementById('progressionTitle');
+const progressionMilestoneEl = document.getElementById('progressionMilestone');
+const progressionMeterFillEl = document.getElementById('progressionMeterFill');
 const todayAttemptsEl = document.getElementById('todayAttempts');
 const todayTimeSpentEl = document.getElementById('todayTimeSpent');
 const timeSpentSitesEl = document.getElementById('timeSpentSites');
@@ -85,8 +89,10 @@ function toHours(seconds) {
 // Render all statistics
 function renderStats(stats) {
   // Streaks
-  currentStreakEl.textContent = stats.streaks.current || 0;
+  const streak = stats.streaks.current || 0;
+  currentStreakEl.textContent = streak;
   longestStreakEl.textContent = stats.streaks.longest || 0;
+  renderProgression(streak);
 
   // Today's stats
   const today = getTodayKey();
@@ -120,6 +126,18 @@ function renderStats(stats) {
   renderTopSitesChart(todayStats.sitesAttempted || {});
   renderBlockAttemptsChart(stats.daily, 'week');
   renderBrowsingTimeChart(stats.daily, 'week');
+}
+
+function renderProgression(streak) {
+  const state = getProgressState(streak);
+  progressionBadgeEl.textContent = state.badge;
+  progressionTitleEl.textContent = state.title;
+  progressionMeterFillEl.style.width = `${Math.round(state.progress * 100)}%`;
+  document.documentElement.style.setProperty('--progress-accent', state.accent);
+  progressionMilestoneEl.textContent =
+    state.daysToNext == null || state.daysToNext === 0
+      ? 'Milestone reached today.'
+      : `Next milestone in ${state.daysToNext} day${state.daysToNext === 1 ? '' : 's'}`;
 }
 
 // Update a specific chart

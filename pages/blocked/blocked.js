@@ -1,7 +1,7 @@
 import { getRandomQuote } from '../../utils/quotes.js';
 import { getStats } from '../../utils/storage.js';
 import { formatTime, getTodayKey } from '../../utils/helpers.js';
-import { getRandomTip, getProgressMessage } from '../../utils/constants.js';
+import { getRandomTip, getProgressState } from '../../utils/constants.js';
 
 // Display random quote
 const quote = getRandomQuote();
@@ -15,20 +15,34 @@ document.getElementById('tipText').textContent = getRandomTip();
 function updateProgressRing(streak) {
   const ring = document.getElementById('progressRing');
   const circumference = 2 * Math.PI * 54; // r=54
+  const progressState = getProgressState(streak);
 
-  // Calculate progress (max out at 30 days for visual purposes)
-  const progress = Math.min(streak / 30, 1);
+  // Calculate progress within current progression stage
+  const progress = progressState.progress;
   const offset = circumference * (1 - progress);
 
   ring.style.strokeDasharray = circumference;
   ring.style.strokeDashoffset = offset;
+  ring.style.stroke = progressState.accent;
+  document.documentElement.style.setProperty(
+    '--progress-accent',
+    progressState.accent,
+  );
 
   // Update value
   document.getElementById('streakValue').textContent = streak;
+  document.getElementById('stageBadge').textContent = progressState.badge;
+  document.getElementById('stageTitle').textContent = progressState.title;
 
   // Update message based on streak
   document.getElementById('progressMessage').textContent =
-    getProgressMessage(streak);
+    progressState.message;
+
+  const milestoneText =
+    progressState.daysToNext == null || progressState.daysToNext === 0
+      ? 'Milestone reached today.'
+      : `Next milestone in ${progressState.daysToNext} day${progressState.daysToNext === 1 ? '' : 's'}`;
+  document.getElementById('progressMilestone').textContent = milestoneText;
 }
 
 // Get the blocked domain info from background script

@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --progress-accent: #64ffda;
+}
+
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
@@ -114,12 +118,14 @@ cite::before {
 
 .progress-ring-fill {
   fill: none;
-  stroke: #64ffda;
+  stroke: var(--progress-accent);
   stroke-width: 8;
   stroke-linecap: round;
   stroke-dasharray: 339.292;
   stroke-dashoffset: 339.292;
-  transition: stroke-dashoffset 1s ease-out;
+  transition:
+    stroke-dashoffset 1s ease-out,
+    stroke 0.4s ease;
 }
 
 .progress-center {
@@ -134,7 +140,7 @@ cite::before {
   display: block;
   font-size: 2rem;
   font-weight: bold;
-  color: #64ffda;
+  color: var(--progress-accent);
   line-height: 1;
 }
 
@@ -148,6 +154,31 @@ cite::before {
   margin-top: 10px;
   color: #ccd6f6;
   font-size: 0.95rem;
+}
+
+.progress-stage {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.stage-badge {
+  font-size: 1rem;
+}
+
+.stage-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--progress-accent);
+}
+
+.progress-milestone {
+  margin-top: 8px;
+  color: #9aa7c4;
+  font-size: 0.82rem;
 }
 
 /* Stats Preview */

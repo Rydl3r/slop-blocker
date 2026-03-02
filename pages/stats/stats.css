@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --progress-accent: #64ffda;
+}
+
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
@@ -117,6 +121,50 @@ header {
 
 .streak-meta strong {
   color: #fff;
+}
+
+.progression-row {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progression-badge {
+  font-size: 1rem;
+}
+
+.progression-title {
+  color: var(--progress-accent);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.progression-milestone {
+  margin-top: 8px;
+  color: #b8c5e3;
+  font-size: 0.82rem;
+}
+
+.progression-meter {
+  width: 100%;
+  max-width: 360px;
+  height: 8px;
+  margin: 10px auto 0;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.progression-meter-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--progress-accent), #ffffff);
+  transition:
+    width 0.45s ease,
+    background 0.35s ease;
 }
 
 /* Stats Grid */

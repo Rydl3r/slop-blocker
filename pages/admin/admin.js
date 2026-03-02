@@ -18,6 +18,7 @@ const globalToggle = document.getElementById('globalToggle');
 const addRuleForm = document.getElementById('addRuleForm');
 const patternInput = document.getElementById('pattern');
 const ruleTypeSelect = document.getElementById('ruleType');
+const ruleNoteInput = document.getElementById('ruleNote');
 const rulesList = document.getElementById('rulesList');
 const formError = document.getElementById('formError');
 const enableSchedule = document.getElementById('enableSchedule');
@@ -66,6 +67,11 @@ function renderRules(rules) {
               : '<span class="rule-schedule-none">Always active</span>'
           }
         </div>
+        ${
+          rule.note?.trim()
+            ? `<div class="rule-note">${escapeHtml(rule.note)}</div>`
+            : ''
+        }
       </div>
       <div class="rule-actions">
         <button class="btn btn-small btn-edit edit-rule">Edit</button>
@@ -132,7 +138,7 @@ function setupEventListeners() {
     }
 
     // Build rule object
-    const ruleData = { pattern, type };
+    const ruleData = { pattern, type, note: ruleNoteInput.value.trim() };
 
     // Add schedule if enabled
     if (enableSchedule.checked) {
@@ -153,6 +159,7 @@ function setupEventListeners() {
 
     // Clear form and reload
     patternInput.value = '';
+    ruleNoteInput.value = '';
     enableSchedule.checked = false;
     scheduleOptions.classList.add('hidden');
     hideError();
@@ -238,6 +245,7 @@ function openEditModal(rule) {
 
   document.getElementById('editPattern').value = rule.pattern;
   document.getElementById('editRuleType').value = rule.type;
+  document.getElementById('editRuleNote').value = rule.note || '';
   populateScheduleForm(rule.schedule);
 
   document.getElementById('editModal').classList.add('active');
@@ -252,6 +260,7 @@ function closeEditModal() {
 async function saveEditedRule() {
   const pattern = document.getElementById('editPattern').value.trim();
   const type = document.getElementById('editRuleType').value;
+  const note = document.getElementById('editRuleNote').value.trim();
 
   // Validate pattern
   const validation = validatePattern(pattern, type);
@@ -277,6 +286,7 @@ async function saveEditedRule() {
   const updates = {
     pattern,
     type,
+    note,
     schedule: getScheduleFromForm(),
   };
 

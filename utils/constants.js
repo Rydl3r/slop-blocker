@@ -44,31 +44,118 @@ export const TIPS = [
   'Act like this matters — because it does.',
 ];
 
-export const PROGRESS_MESSAGES = [
-  { min: 0, max: 0, message: 'Start your journey today!' },
-  { min: 1, max: 2, message: 'Great start! Keep building momentum.' },
-  { min: 3, max: 6, message: "You're building a habit!" },
-  { min: 7, max: 13, message: 'One week strong! 💪' },
-  { min: 14, max: 29, message: "Two weeks! You're crushing it!" },
-  { min: 30, max: 59, message: 'A full month! Incredible discipline!' },
+export const PROGRESS_STAGES = [
+  {
+    min: 0,
+    max: 0,
+    title: 'Boot Sequence',
+    badge: '🌱',
+    message: 'Start your journey today!',
+    accent: '#64ffda',
+  },
+  {
+    min: 1,
+    max: 2,
+    title: 'Momentum Spark',
+    badge: '⚡',
+    message: 'Great start! Keep building momentum.',
+    accent: '#4ade80',
+  },
+  {
+    min: 3,
+    max: 6,
+    title: 'Habit Draft',
+    badge: '🛠️',
+    message: "You're building a habit.",
+    accent: '#22d3ee',
+  },
+  {
+    min: 7,
+    max: 13,
+    title: 'Week Warrior',
+    badge: '🔥',
+    message: 'One week strong.',
+    accent: '#38bdf8',
+  },
+  {
+    min: 14,
+    max: 29,
+    title: 'Focus Builder',
+    badge: '🧱',
+    message: "Two weeks in. You're stacking wins.",
+    accent: '#818cf8',
+  },
+  {
+    min: 30,
+    max: 44,
+    title: 'Month I Complete',
+    badge: '🏁',
+    message: 'A full month. You made this real.',
+    accent: '#a78bfa',
+  },
+  {
+    min: 45,
+    max: 59,
+    title: 'Month II Grind',
+    badge: '⛰️',
+    message: 'You pushed past the novelty phase.',
+    accent: '#c084fc',
+  },
   {
     min: 60,
     max: 89,
-    message: 'Two months deep! This is part of who you are now.',
+    title: 'Deep Work Mode',
+    badge: '🧠',
+    message: 'Two months deep. This is who you are now.',
+    accent: '#f472b6',
   },
-  { min: 90, max: 119, message: 'Three months! Serious consistency 🔥' },
+  {
+    min: 90,
+    max: 119,
+    title: 'Quarter Locked',
+    badge: '🏆',
+    message: 'Three months. Serious consistency.',
+    accent: '#fb7185',
+  },
   {
     min: 120,
     max: 179,
-    message: 'Four months strong! Most people never get here.',
+    title: 'System Operator',
+    badge: '⚙️',
+    message: 'Four to six months. Your system is working.',
+    accent: '#f97316',
   },
-  { min: 180, max: 239, message: 'Six months! This habit is locked in 🧠' },
-  { min: 240, max: 364, message: 'Almost a year! Elite-level commitment.' },
-  { min: 365, max: 729, message: 'One full year! Absolute legend status 🏆' },
+  {
+    min: 180,
+    max: 239,
+    title: 'Relapse Resistant',
+    badge: '🛡️',
+    message: 'Half-year discipline. Most people never get here.',
+    accent: '#f59e0b',
+  },
+  {
+    min: 240,
+    max: 364,
+    title: 'Elite Cadence',
+    badge: '👑',
+    message: 'Approaching one year. Elite-level commitment.',
+    accent: '#eab308',
+  },
+  {
+    min: 365,
+    max: 729,
+    title: 'One-Year Legend',
+    badge: '🚀',
+    message: 'A full year complete. Absolute legend.',
+    accent: '#84cc16',
+  },
   {
     min: 730,
     max: Infinity,
-    message: "You're unstoppable. This is a lifestyle.",
+    title: 'Lifestyle Master',
+    badge: '🌌',
+    message: 'You are maintaining this as a lifestyle.',
+    accent: '#14b8a6',
   },
 ];
 
@@ -105,8 +192,47 @@ export function getRandomTip() {
  * Get progress message based on streak
  */
 export function getProgressMessage(streak) {
-  const found = PROGRESS_MESSAGES.find(
+  const found = PROGRESS_STAGES.find(
     (p) => streak >= p.min && streak <= p.max,
   );
   return found?.message || 'Keep going!';
+}
+
+/**
+ * Get rich progression state for streak visuals.
+ */
+export function getProgressState(streak) {
+  const safeStreak = Math.max(0, Number(streak) || 0);
+  const stageIndex = PROGRESS_STAGES.findIndex(
+    (stage) => safeStreak >= stage.min && safeStreak <= stage.max,
+  );
+  const stage = PROGRESS_STAGES[Math.max(stageIndex, 0)];
+  const nextStage = PROGRESS_STAGES[stageIndex + 1];
+
+  let progress = 0;
+  let nextMilestone = null;
+
+  if (Number.isFinite(stage.max) && stage.max > stage.min) {
+    progress = (safeStreak - stage.min) / (stage.max - stage.min);
+    nextMilestone = nextStage?.min ?? null;
+  } else if (Number.isFinite(stage.max)) {
+    nextMilestone = nextStage?.min ?? null;
+  } else if (stage.max === Infinity) {
+    const cycleSize = 30;
+    const cycleOffset = (safeStreak - stage.min + cycleSize) % cycleSize;
+    progress = cycleOffset / cycleSize;
+    nextMilestone = safeStreak + (cycleSize - cycleOffset || cycleSize);
+  }
+
+  return {
+    streak: safeStreak,
+    title: stage.title,
+    badge: stage.badge,
+    message: stage.message,
+    accent: stage.accent,
+    progress: Math.max(0, Math.min(1, progress)),
+    nextMilestone,
+    daysToNext:
+      nextMilestone == null ? null : Math.max(0, nextMilestone - safeStreak),
+  };
 }

@@ -151,8 +151,23 @@ input:checked + .slider:before {
   transition: border-color 0.3s ease;
 }
 
+.form-group textarea {
+  width: 100%;
+  padding: 12px 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 70px;
+  transition: border-color 0.3s ease;
+}
+
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: #64ffda;
 }
@@ -319,6 +334,17 @@ input:checked + .slider:before {
   gap: 12px;
   align-items: center;
   margin-top: 4px;
+}
+
+.rule-note {
+  margin-top: 8px;
+  color: #b8c5e3;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
 }
 
 .rule-type {

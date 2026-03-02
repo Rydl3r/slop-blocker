@@ -5,12 +5,17 @@ import {
   saveSettings,
 } from '../utils/storage.js';
 import { getTodayKey } from '../utils/helpers.js';
+import { getProgressState } from '../utils/constants.js';
 
 // DOM Elements
 const mainToggle = document.getElementById('mainToggle');
 const statusText = document.getElementById('statusText');
 const todayBlocksEl = document.getElementById('todayBlocks');
 const streakEl = document.getElementById('streak');
+const popupProgressBadgeEl = document.getElementById('popupProgressBadge');
+const popupProgressTitleEl = document.getElementById('popupProgressTitle');
+const popupProgressFillEl = document.getElementById('popupProgressFill');
+const popupProgressMilestoneEl = document.getElementById('popupProgressMilestone');
 const rulesCountEl = document.getElementById('rulesCount');
 const openSettingsLink = document.getElementById('openSettings');
 const openStatsLink = document.getElementById('openStats');
@@ -34,12 +39,26 @@ async function loadData() {
   const todayStats = stats.daily[today] || { blockAttempts: 0 };
 
   todayBlocksEl.textContent = todayStats.blockAttempts;
-  streakEl.textContent = stats.streaks.current || 0;
+  const streak = stats.streaks.current || 0;
+  streakEl.textContent = streak;
+  renderProgression(streak);
 
   // Load rules count
   const rules = await getRules();
   const enabledRules = rules.filter((r) => r.enabled);
   rulesCountEl.textContent = enabledRules.length;
+}
+
+function renderProgression(streak) {
+  const state = getProgressState(streak);
+  popupProgressBadgeEl.textContent = state.badge;
+  popupProgressTitleEl.textContent = state.title;
+  popupProgressFillEl.style.width = `${Math.round(state.progress * 100)}%`;
+  popupProgressMilestoneEl.textContent =
+    state.daysToNext == null || state.daysToNext === 0
+      ? 'Milestone reached today.'
+      : `Next milestone in ${state.daysToNext} day${state.daysToNext === 1 ? '' : 's'}`;
+  document.documentElement.style.setProperty('--progress-accent', state.accent);
 }
 
 // Update status text
