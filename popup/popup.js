@@ -15,15 +15,39 @@ const streakEl = document.getElementById('streak');
 const popupProgressBadgeEl = document.getElementById('popupProgressBadge');
 const popupProgressTitleEl = document.getElementById('popupProgressTitle');
 const popupProgressFillEl = document.getElementById('popupProgressFill');
-const popupProgressMilestoneEl = document.getElementById('popupProgressMilestone');
+const popupProgressMilestoneEl = document.getElementById(
+  'popupProgressMilestone',
+);
 const rulesCountEl = document.getElementById('rulesCount');
 const openSettingsLink = document.getElementById('openSettings');
 const openStatsLink = document.getElementById('openStats');
 
 // Initialize
 async function init() {
+  await checkIncognitoAccess();
   await loadData();
   setupEventListeners();
+}
+
+// Show a warning banner if running in incognito without extension access
+async function checkIncognitoAccess() {
+  const currentWindow = await chrome.windows.getCurrent();
+  if (!currentWindow.incognito) return;
+
+  const hasAccess = await chrome.extension.isAllowedIncognitoAccess();
+  if (hasAccess) return;
+
+  const warning = document.getElementById('incognitoWarning');
+  warning.style.display = 'block';
+
+  document
+    .getElementById('openExtensionsPage')
+    .addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({
+        url: 'chrome://extensions/?id=' + chrome.runtime.id,
+      });
+    });
 }
 
 // Load all data

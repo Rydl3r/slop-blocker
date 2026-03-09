@@ -189,7 +189,7 @@ let currentEditId = null;
 
 // Default schedule values
 const DEFAULT_SCHEDULE = {
-  startTime: '09:00',
+  startTime: '06:00',
   endTime: '18:00',
   days: [1, 2, 3, 4, 5], // Weekdays
 };

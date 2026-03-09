@@ -47,5 +47,6 @@
       "matches": ["<all_urls>"]
     }
   ],
-  "options_page": "pages/admin/admin.html"
+  "options_page": "pages/admin/admin.html",
+  "incognito": "split"
 }
