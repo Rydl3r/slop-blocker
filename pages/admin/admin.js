@@ -28,6 +28,7 @@ const endTimeInput = document.getElementById('endTime');
 
 // Initialize
 async function init() {
+  // Load persisted data before wiring handlers so initial UI state is accurate.
   await loadSettings();
   await loadRules();
   setupEventListeners();
@@ -130,7 +131,7 @@ function setupEventListeners() {
       return;
     }
 
-    // Check for duplicates
+    // Keep matching case-insensitive so users cannot add visual duplicates.
     const rules = await getRules();
     if (rules.some((r) => r.pattern.toLowerCase() === pattern.toLowerCase())) {
       showError('This pattern is already blocked');
@@ -196,6 +197,7 @@ const DEFAULT_SCHEDULE = {
 
 // Helper: Populate schedule form fields
 function populateScheduleForm(schedule, prefix = 'edit') {
+  // Unscheduled rules default to weekday daytime values when opened for editing.
   const hasSchedule = schedule?.enabled;
   const scheduleData = hasSchedule ? schedule : DEFAULT_SCHEDULE;
 
@@ -217,6 +219,7 @@ function populateScheduleForm(schedule, prefix = 'edit') {
 // Helper: Get schedule from form
 function getScheduleFromForm(prefix = 'edit') {
   const enabled = document.getElementById(`${prefix}EnableSchedule`).checked;
+  // `null` is used consistently as "always active" in storage.
   if (!enabled) return null;
 
   const selectedDays = Array.from(
@@ -241,6 +244,7 @@ function showEditError(message) {
 }
 
 function openEditModal(rule) {
+  // Keep the current id in module state to support save/cancel flows.
   currentEditId = rule.id;
 
   document.getElementById('editPattern').value = rule.pattern;
@@ -269,7 +273,7 @@ async function saveEditedRule() {
     return;
   }
 
-  // Check for duplicates (excluding current rule)
+  // Check for duplicates (excluding current rule) to prevent collisions after edits.
   const rules = await getRules();
   const isDuplicate = rules.some(
     (r) =>

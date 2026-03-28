@@ -1,31 +1,76 @@
 # Slop Blocker
 
-A Chrome extension to help you stay focused by blocking distracting websites.
+Slop Blocker is a Chrome Extension (Manifest V3) that helps users stay focused by blocking distracting sites, showing a purposeful interruption page, and tracking behavior over time.
 
-## Features
+This project is designed to be lightweight, privacy-first, and easy to understand in source form (no framework build step).
 
-- 🚫 **Block Websites** - Block entire domains or specific URL patterns
-- 📊 **Statistics** - Track block attempts and maintain streaks
-- 💪 **Motivational Quotes** - See inspiring quotes when you try to access blocked sites
-- 🎯 **Quick Presets** - One-click blocking for popular social media sites
-- 🔄 **Toggle On/Off** - Easily enable or disable blocking
+## Why This Exists
 
-## Installation
+Most blockers are either too permissive or too invasive. Slop Blocker focuses on:
 
-### Developer Mode (Local Installation)
+- fast blocking with minimal UI friction
+- transparent local-only data storage
+- behavior feedback (streaks, time spent, slippages)
+- temporary bypasses that are intentionally costly
 
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable **Developer mode** (toggle in the top-right corner)
+## Core Features
+
+- Domain, URL wildcard, and regex rule types
+- Optional schedule windows per rule (time + days)
+- Temporary bypass flow (records slippage and resets streak)
+- Daily and historical stats dashboard
+- Motivational blocked page with progression state
+- One-click global enable/disable toggle
+
+## Product Walkthrough
+
+1. Add rules in the admin page.
+2. Background service worker converts active rules into dynamic `declarativeNetRequest` rules.
+3. Matching navigation is redirected to the blocked page.
+4. Block attempts and blocked-site time are recorded in local storage.
+5. Popup and stats pages surface progress and streak milestones.
+
+## Architecture
+
+### Runtime Pieces
+
+- `background/service-worker.js`: rule compilation, alarms, bypass expiry, message router
+- `popup/`: compact control surface for quick state and navigation
+- `pages/admin/`: full rule CRUD + schedule config
+- `pages/blocked/`: interruption UX + bypass confirmation
+- `pages/stats/`: progression and behavior analytics
+- `content/tracker.js`: time tracking for blocked domains
+- `utils/`: storage, pattern matching, constants, and helper utilities
+
+Detailed architecture notes: see `docs/ARCHITECTURE.md`.
+
+### Data Model (stored in `chrome.storage.local`)
+
+- `blockRules`: list of rule objects (`pattern`, `type`, `enabled`, optional `schedule`, `note`)
+- `statistics`: daily attempts/time, streaks, slippages, totals
+- `settings`: global extension toggles
+- `activeBypass`: active temporary bypass domain + expiry
+
+## Tech Stack
+
+- JavaScript (ES Modules)
+- Chrome Extension APIs (Manifest V3)
+- `declarativeNetRequest` for efficient network-level blocking
+- Chart.js for stats visualizations
+
+## Installation (Local / Portfolio Demo)
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode**
 3. Click **Load unpacked**
-4. Select the `slop-blocker` folder
-5. The extension icon should appear in your toolbar
+4. Select this project folder
+5. Pin the extension and open the popup
 
-### Generate Icons
+### Optional Icon Generation
 
-Before loading the extension, you need to generate PNG icons from the SVG:
+If PNG icons are missing, generate them from `assets/icons/icon.svg`:
 
 ```bash
-# If you have ImageMagick installed:
 cd assets/icons
 convert -background none icon.svg -resize 16x16 icon16.png
 convert -background none icon.svg -resize 32x32 icon32.png
@@ -33,72 +78,45 @@ convert -background none icon.svg -resize 48x48 icon48.png
 convert -background none icon.svg -resize 128x128 icon128.png
 ```
 
-Or you can create simple placeholder PNGs manually.
+## Local Development
 
-## Usage
+No bundler is required.
 
-### Adding Blocked Sites
+1. Edit source files directly.
+2. Refresh the extension card in `chrome://extensions/`.
+3. Re-open popup/page views to validate behavior.
 
-1. Click the extension icon in your toolbar
-2. Click "Settings" to open the admin panel
-3. Enter a website domain (e.g., `twitter.com`) and click "Add Rule"
-4. Or use the quick presets to block popular sites with one click
+## Testing Checklist
 
-### Viewing Statistics
+- Add one rule for each rule type (`domain`, `url`, `regex`).
+- Verify block redirect triggers only for matching URLs.
+- Confirm scheduled rules activate/deactivate as expected.
+- Trigger temporary bypass and verify streak reset + slippage record.
+- Check popup, blocked page, and stats page values remain consistent.
+- Wait past bypass expiry and verify blocking resumes automatically.
 
-1. Click the extension icon
-2. Click "Statistics" to see your progress
-3. Track your daily block attempts and day streak
+## Privacy
 
-### Blocking Types
+All user data is stored locally via `chrome.storage.local`.
 
-- **Domain** - Blocks the entire website (e.g., `twitter.com` blocks all of Twitter)
-- **URL Pattern** - Block specific paths with wildcards (e.g., `youtube.com/shorts/*`)
-- **Regex** - Advanced pattern matching for power users
+- no external analytics
+- no remote database
+- no account required
 
-## Project Structure
+Contribution guide: see `CONTRIBUTING.md`.
 
-```
-slop-blocker/
-├── manifest.json           # Extension configuration
-├── background/
-│   └── service-worker.js   # Handles blocking logic
-├── popup/
-│   ├── popup.html          # Quick access popup
-│   ├── popup.css
-│   └── popup.js
-├── pages/
-│   ├── blocked/            # Block page with quote
-│   ├── admin/              # Settings panel
-│   └── stats/              # Statistics dashboard
-├── utils/
-│   ├── storage.js          # Chrome storage wrapper
-│   ├── patterns.js         # URL matching logic
-│   └── quotes.js           # Motivational quotes
-└── assets/
-    └── icons/
-```
+## Tradeoffs and Notes
 
-## Development
+- `onRuleMatchedDebug` availability depends on extension/debug permissions and browser support.
+- Rule updates are serialized in the service worker to avoid dynamic rule race conditions.
+- Time tracking is domain-based and intentionally coarse, favoring low overhead.
 
-This extension uses Manifest V3 and ES modules. No build step required - just edit the files and reload the extension.
+## Roadmap
 
-### Testing Changes
-
-1. Make your changes
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on the Slop Blocker card
-4. Test your changes
-
-## Future Improvements
-
-- [ ] Scheduled blocking (work hours vs. evenings)
-- [ ] Focus sessions / Nuclear mode
-- [ ] Password protection
-- [ ] Data export/import
-- [ ] Chrome sync across devices
-- [ ] Time limits instead of full blocks
-- [ ] Partial page blocking (e.g., YouTube feed)
+- Sync support via `chrome.storage.sync`
+- Export/import user settings and stats
+- Focus session presets (work, study, deep work)
+- Better pattern validation UX with inline examples
 
 ## License
 

@@ -24,6 +24,7 @@ const openStatsLink = document.getElementById('openStats');
 
 // Initialize
 async function init() {
+  // Incognito permission state changes what guidance we show in the popup.
   await checkIncognitoAccess();
   await loadData();
   setupEventListeners();
@@ -75,6 +76,7 @@ async function loadData() {
 
 function renderProgression(streak) {
   const state = getProgressState(streak);
+  // The same progression model is shared across popup, blocked page, and stats.
   popupProgressBadgeEl.textContent = state.badge;
   popupProgressTitleEl.textContent = state.title;
   popupProgressFillEl.style.width = `${Math.round(state.progress * 100)}%`;
@@ -100,7 +102,7 @@ function setupEventListeners() {
     await saveSettings(settings);
     updateStatusText(settings.enabled);
 
-    // Notify background to update rules
+    // Dynamic DNR rules must be rebuilt whenever global enabled state changes.
     chrome.runtime.sendMessage({ type: 'UPDATE_RULES' });
   });
 

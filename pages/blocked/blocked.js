@@ -57,7 +57,7 @@ async function getBlockedInfo() {
 // Record this block attempt via background script
 async function recordBlock(domain) {
   if (domain) {
-    // Use sessionStorage to prevent double-counting on refresh
+    // Use a short time bucket so reload loops do not inflate block metrics.
     const blockKey = `blocked_${domain}_${Date.now().toString().slice(0, -4)}`; // ~10 second window
     if (!sessionStorage.getItem(blockKey)) {
       sessionStorage.setItem(blockKey, 'true');
@@ -147,7 +147,7 @@ document
     if (!confirmed) return;
 
     try {
-      // Send message to background to enable bypass
+      // Background owns bypass persistence and rule regeneration.
       const result = await chrome.runtime.sendMessage({
         type: 'TEMPORARY_BYPASS',
         domain: domain,
