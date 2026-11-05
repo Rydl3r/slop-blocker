@@ -80,11 +80,20 @@ export async function deleteRule(id) {
 
 export async function getStats() {
   const stats = await getStorageData(STORAGE_KEYS.STATS);
-  return { ...DEFAULT_STATS, ...stats };
+  return { ...structuredClone(DEFAULT_STATS), ...stats };
 }
 
 export async function saveStats(stats) {
   await setStorageData(STORAGE_KEYS.STATS, stats);
+}
+
+// Stats are read-modify-write; serialize mutations so concurrent messages
+// (time tracking from several tabs, block records) don't overwrite each other.
+let statsQueue = Promise.resolve();
+function withStatsLock(fn) {
+  const run = statsQueue.then(fn);
+  statsQueue = run.catch(() => {});
+  return run;
 }
 
 /**
@@ -102,7 +111,8 @@ function ensureTodayStats(stats) {
   return stats.daily[today];
 }
 
-export async function recordBlockAttempt(domain) {
+export function recordBlockAttempt(domain) {
+  return withStatsLock(async () => {
   const stats = await getStats();
   const todayStats = ensureTodayStats(stats);
 
@@ -113,9 +123,11 @@ export async function recordBlockAttempt(domain) {
 
   await saveStats(stats);
   return stats;
+  });
 }
 
-export async function recordTimeSpent(domain, seconds) {
+export function recordTimeSpent(domain, seconds) {
+  return withStatsLock(async () => {
   const stats = await getStats();
   const todayStats = ensureTodayStats(stats);
 
@@ -129,9 +141,11 @@ export async function recordTimeSpent(domain, seconds) {
 
   await saveStats(stats);
   return stats;
+  });
 }
 
-export async function recordSlippageAndResetStreak(domain) {
+export function recordSlippageAndResetStreak(domain) {
+  return withStatsLock(async () => {
   const stats = await getStats();
   ensureTodayStats(stats);
 
@@ -154,9 +168,11 @@ export async function recordSlippageAndResetStreak(domain) {
 
   await saveStats(stats);
   return { slippageRecorded: true, streakBroken };
+  });
 }
 
-export async function incrementStreak() {
+export function incrementStreak() {
+  return withStatsLock(async () => {
   const stats = await getStats();
   const today = getTodayKey();
 
@@ -172,6 +188,7 @@ export async function incrementStreak() {
   }
 
   return stats;
+  });
 }
 
 // ============ Settings ============
@@ -194,13 +211,20 @@ export async function toggleEnabled() {
 
 // ============ Bypass ============
 
+/**
+ * Active bypass shape: { domain, url, ruleIds: string[], expiry }
+ * `ruleIds` are the rules that matched the bypassed URL; only those rules are
+ * suspended until `expiry`.
+ */
 export async function getActiveBypass() {
   return (await getStorageData(STORAGE_KEYS.BYPASS)) || null;
 }
 
-export async function setBypass(domain, durationMinutes = 5) {
+export async function setBypass({ domain, url, ruleIds }, durationMinutes = 5) {
   const bypass = {
     domain,
+    url,
+    ruleIds,
     expiry: Date.now() + durationMinutes * 60 * 1000,
   };
   await setStorageData(STORAGE_KEYS.BYPASS, bypass);
@@ -211,18 +235,4 @@ export async function clearBypass() {
   await setStorageData(STORAGE_KEYS.BYPASS, null);
 }
 
-export async function isDomainBypassed(domain) {
-  const bypass = await getActiveBypass();
-  if (!bypass) return false;
-
-  if (Date.now() > bypass.expiry) {
-    await clearBypass();
-    return false;
-  }
-
-  const bypassDomain = bypass.domain.toLowerCase();
-  const checkDomain = domain.toLowerCase();
-  return (
-    checkDomain === bypassDomain || checkDomain.endsWith('.' + bypassDomain)
-  );
-}
+export { STORAGE_KEYS };

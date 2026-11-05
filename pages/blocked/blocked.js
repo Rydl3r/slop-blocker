@@ -45,13 +45,16 @@ function updateProgressRing(streak) {
   document.getElementById('progressMilestone').textContent = milestoneText;
 }
 
-// Get the blocked domain info from background script
-async function getBlockedInfo() {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'GET_LAST_BLOCKED' }, (response) => {
-      resolve(response);
-    });
-  });
+// The original URL is carried in the hash: blocked.html#https://site/path
+function getBlockedInfo() {
+  const url = location.hash.slice(1);
+  try {
+    const parsed = new URL(url);
+    if (!/^https?:$/.test(parsed.protocol)) return null;
+    return { url, domain: parsed.hostname.replace(/^www\./, '') };
+  } catch {
+    return null;
+  }
 }
 
 // Record this block attempt via background script
@@ -73,7 +76,7 @@ let currentBlockedInfo = null;
 async function loadStats() {
   try {
     // Get blocked info from background
-    const blockedInfo = await getBlockedInfo();
+    const blockedInfo = getBlockedInfo();
     currentBlockedInfo = blockedInfo;
     const blockedDomain = blockedInfo?.domain || 'This site';
 
@@ -82,7 +85,7 @@ async function loadStats() {
       `${blockedDomain} has been blocked`;
 
     // Record the block
-    await recordBlock(blockedDomain);
+    await recordBlock(blockedInfo?.domain);
 
     const stats = await getStats();
     const today = getTodayKey();
@@ -129,7 +132,7 @@ document
     const domain = currentBlockedInfo?.domain;
     const originalUrl = currentBlockedInfo?.url;
 
-    if (!domain) {
+    if (!domain || !originalUrl) {
       alert('Could not determine the blocked domain. Please try again.');
       return;
     }
@@ -150,15 +153,12 @@ document
       // Background owns bypass persistence and rule regeneration.
       const result = await chrome.runtime.sendMessage({
         type: 'TEMPORARY_BYPASS',
-        domain: domain,
-        originalUrl: originalUrl,
+        url: originalUrl,
       });
 
       if (result?.success) {
         // Redirect to the original URL
-        const redirectUrl =
-          result.redirectUrl || originalUrl || `https://${domain}`;
-        window.location.href = redirectUrl;
+        window.location.replace(result.redirectUrl || originalUrl);
       } else {
         alert('Failed to enable bypass. Please try again.');
       }

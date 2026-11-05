@@ -102,8 +102,7 @@ function setupEventListeners() {
     await saveSettings(settings);
     updateStatusText(settings.enabled);
 
-    // Dynamic DNR rules must be rebuilt whenever global enabled state changes.
-    chrome.runtime.sendMessage({ type: 'UPDATE_RULES' });
+    // The service worker watches storage and re-applies blocking itself.
   });
 
   // Open settings in new tab

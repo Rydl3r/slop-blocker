@@ -180,10 +180,9 @@ function hideError() {
   formError.classList.add('hidden');
 }
 
-// Notify background script to update rules
-function notifyBackgroundUpdate() {
-  chrome.runtime.sendMessage({ type: 'UPDATE_RULES' });
-}
+// The service worker listens to storage changes and re-applies blocking
+// (including kicking blocked sites out of already-open tabs), so nothing to do.
+function notifyBackgroundUpdate() {}
 
 // Edit Modal Functions
 let currentEditId = null;

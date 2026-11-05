@@ -12,9 +12,10 @@ This document explains how Slop Blocker is structured and how data moves through
 
 1. User creates rules in the admin page.
 2. Rules are stored in `chrome.storage.local`.
-3. Background service worker translates active rules into dynamic `declarativeNetRequest` rules.
+3. Background service worker compiles every active rule to one regex (`utils/patterns.js`) and installs it as a dynamic `declarativeNetRequest` redirect. The blocked page receives the original URL in its hash (`blocked.html#<url>`).
 4. Matching top-level navigations are redirected to the blocked page.
-5. Block attempts and time are recorded and shown in popup/stats.
+5. A second enforcement layer (tab watcher in the service worker + `content/tracker.js`) uses the same regex to catch what DNR can't see: SPA navigations, back/forward-cache restores, tabs already open when a rule/schedule/bypass changes, and regexes RE2 can't compile.
+6. Block attempts and time are recorded and shown in popup/stats.
 
 ## Runtime Components
 
@@ -126,7 +127,8 @@ Object:
 
 Object or `null`:
 
-- `domain`
+- `domain`, `url`: what was bypassed
+- `ruleIds`: rules suspended during the bypass
 - `expiry` timestamp
 
 ## Permissions and APIs
@@ -146,9 +148,11 @@ Note:
 
 ## Reliability Notes
 
-- Schedule state is refreshed on a 1-minute alarm cadence.
-- Expired bypass state is actively cleared and rules are rebuilt.
-- Rule IDs are regenerated from a fixed range after removing previous dynamic rules.
+- The service worker listens to `chrome.storage.onChanged`; any change to rules, settings or bypass resyncs DNR and sweeps open tabs. UI pages only write storage.
+- DNR updates are a single atomic call. If the batch fails, rules are installed one by one; any rule DNR rejects is enforced via `webNavigation` instead.
+- A 1-minute alarm resyncs schedules and sweeps tabs; a one-shot alarm ends a bypass on time.
+- Stats mutations are serialized to avoid lost updates.
+- Day keys use local time, not UTC.
 
 ## Privacy
 

@@ -79,11 +79,24 @@ export function generateId() {
 }
 
 /**
- * Get today's date as YYYY-MM-DD string
+ * Format a date as a LOCAL YYYY-MM-DD key (toISOString would use UTC and roll
+ * the day over at the wrong hour).
+ * @param {Date} date
+ * @returns {string}
+ */
+export function dateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Get today's local date as YYYY-MM-DD string
  * @returns {string} Today's date key
  */
 export function getTodayKey() {
-  return new Date().toISOString().split('T')[0];
+  return dateKey(new Date());
 }
 
 /**

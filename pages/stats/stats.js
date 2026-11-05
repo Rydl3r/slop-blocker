@@ -1,5 +1,10 @@
 import { getStats } from '../../utils/storage.js';
-import { escapeHtml, formatTime, getTodayKey } from '../../utils/helpers.js';
+import {
+  dateKey,
+  escapeHtml,
+  formatTime,
+  getTodayKey,
+} from '../../utils/helpers.js';
 import { CHART_COLORS, getProgressState } from '../../utils/constants.js';
 
 // Use shared color palette
@@ -151,8 +156,8 @@ function updateChart(chartType, dailyStats, period) {
 }
 
 // Helper: Sum stats for a date key
-function sumDayStats(dailyStats, dateKey) {
-  const dayStats = dailyStats[dateKey] || {};
+function sumDayStats(dailyStats, key) {
+  const dayStats = dailyStats[key] || {};
   return {
     attempts: dayStats.blockAttempts || 0,
     blockedTime: Object.values(dayStats.timeSpent || {}).reduce(
@@ -166,7 +171,7 @@ function sumDayStats(dailyStats, dateKey) {
 function aggregateRange(dailyStats, dates) {
   return dates.reduce(
     (acc, date) => {
-      const key = date.toISOString().split('T')[0];
+      const key = dateKey(date);
       const stats = sumDayStats(dailyStats, key);
       acc.attempts += stats.attempts;
       acc.blockedTime += stats.blockedTime;
@@ -193,7 +198,7 @@ function getPeriodData(dailyStats, period) {
     return Array.from({ length: 7 }, (_, i) => {
       const date = new Date(today);
       date.setDate(date.getDate() - (6 - i));
-      const stats = sumDayStats(dailyStats, date.toISOString().split('T')[0]);
+      const stats = sumDayStats(dailyStats, dateKey(date));
       return {
         label: date.toLocaleDateString('en-GB', { weekday: 'short' }),
         ...stats,
